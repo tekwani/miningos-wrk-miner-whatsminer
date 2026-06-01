@@ -4,6 +4,7 @@ const WrkRack = require('@tetherto/miningos-tpl-wrk-miner/workers/rack.miner.wrk
 const Miner = require('./miner.js')
 const TcpFacility = require('@tetherto/svc-facs-tcp')
 const async = require('async')
+const path = require('path')
 
 const DEFAULT_PORT = 4028
 const { DEFAULT_NOMINAL_EFFICIENCY_WTHS } = require('./constants')
@@ -106,7 +107,8 @@ class WrkMinerRack extends WrkRack {
       conf: this.conf.thing.miner || {},
       id: thg.id,
       nominalEfficiencyWThs: this.getNominalEficiencyWThs(),
-      type: thg.type
+      type: thg.type,
+      findFirmware: this.getFirmwareById.bind(this)
     })
 
     await miner.init()
@@ -123,6 +125,14 @@ class WrkMinerRack extends WrkRack {
     thg.ctrl = miner
 
     return 1
+  }
+
+  async getFirmwareById (id) {
+    const firmwares = await this.listFirmwares()
+    const firmware = firmwares.find((fw) => fw.id === id)
+    if (!firmware) throw new Error('ERR_FIRMWARE_NOT_FOUND')
+    const dir = this.conf.thing.dirFirmwares || 'firmwares'
+    return path.join(dir, firmware.file)
   }
 }
 

@@ -81,7 +81,7 @@ test('readFirmware - simple firmware file without packages', (t) => {
   }
 })
 
-test('readFirmware - firmware file with matching chip type', (t) => {
+test('readFirmware - firmware file with matching platform', (t) => {
   const tempFile = path.join(__dirname, 'temp_package_firmware.bin')
 
   try {
@@ -93,7 +93,7 @@ test('readFirmware - firmware file with matching chip type', (t) => {
       packageSize: 256
     })
 
-    const result = readFirmware('H36K07', tempFile)
+    const result = readFirmware('H616', tempFile)
 
     t.ok(result, 'should return result')
     t.ok(result.content, 'should have content')
@@ -105,21 +105,21 @@ test('readFirmware - firmware file with matching chip type', (t) => {
   }
 })
 
-test('readFirmware - firmware file with non-matching chip type', (t) => {
-  const tempFile = path.join(__dirname, 'temp_wrong_chip_firmware.bin')
+test('readFirmware - firmware file with non-matching platform', (t) => {
+  const tempFile = path.join(__dirname, 'temp_wrong_platform_firmware.bin')
 
   try {
     createMockFirmwareFile(tempFile, {
       packageCount: 1,
-      chipType: 'H36K08', // Different chip type
+      chipType: 'H36K07',
       platform: 'H616',
       packageOffset: 0,
       packageSize: 256
     })
 
-    const result = readFirmware('H36K07', tempFile)
+    const result = readFirmware('H617', tempFile)
 
-    t.is(result, null, 'should return null for non-matching chip type')
+    t.is(result, null, 'should return null for non-matching platform')
   } finally {
     if (fs.existsSync(tempFile)) {
       fs.unlinkSync(tempFile)
@@ -148,15 +148,15 @@ test('readFirmware - firmware file with multiple packages', (t) => {
     const packageInfoOffset = 6 * 4
     const packageInfoSize = 16 * 2 + 4 + 4 + 16 * 4
 
-    // First package - H36K07
+    // First package - platform H616
     buffer.write('H36K07', packageInfoOffset, 6, 'utf8')
     buffer.write('H616', packageInfoOffset + 16, 4, 'utf8')
     buffer.writeUInt32LE(0, packageInfoOffset + 32) // offset
     buffer.writeUInt32LE(512, packageInfoOffset + 36) // size
 
-    // Second package - H36K08
+    // Second package - platform H617
     buffer.write('H36K08', packageInfoOffset + packageInfoSize, 6, 'utf8')
-    buffer.write('H616', packageInfoOffset + packageInfoSize + 16, 4, 'utf8')
+    buffer.write('H617', packageInfoOffset + packageInfoSize + 16, 4, 'utf8')
     buffer.writeUInt32LE(512, packageInfoOffset + packageInfoSize + 32) // offset
     buffer.writeUInt32LE(512, packageInfoOffset + packageInfoSize + 36) // size
 
@@ -167,9 +167,9 @@ test('readFirmware - firmware file with multiple packages', (t) => {
 
     fs.writeFileSync(tempFile, buffer)
 
-    const result = readFirmware('H36K07', tempFile)
+    const result = readFirmware('H616', tempFile)
 
-    t.ok(result, 'should return result for matching chip type')
+    t.ok(result, 'should return result for matching platform')
     t.is(result.size, 512, 'should have correct size for first package')
   } finally {
     if (fs.existsSync(tempFile)) {

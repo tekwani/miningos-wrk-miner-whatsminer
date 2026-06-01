@@ -183,7 +183,7 @@ function runServer (argv, ops = {}) {
     throw Error('ERR_INVALID_STATE')
   }
 
-  const processCmd = async (socket, chunk) => {
+  const processCmd = async (socket, chunk, socketCtx) => {
     const req = JSON.parse(chunk.toString())
     const id = req.ctx?.mockControl?.generateId()
     const isEncrypted = req.enc === 1
@@ -246,6 +246,19 @@ function runServer (argv, ops = {}) {
         return
       }
 
+      // Firmware transfer: respond with "ready" and keep socket open to receive binary data
+      if (res.__firmwareReady) {
+        const readyResp = { STATUS: 'S', When: +new Date(), Code: 131, Msg: 'ready', Description: '' }
+        if (isEncrypted) {
+          socket.write(encryptResponse(readyResp, encryptionKey))
+        } else {
+          socket.write(JSON.stringify(readyResp))
+        }
+        socketCtx.firmwareMode = true
+        socketCtx.isEncrypted = isEncrypted
+        return
+      }
+
       await sendResponse(socket, res, encryptionKey, isEncrypted, CTX.delay)
     } catch (e) {
       debug(new Date(), cmd, e)
@@ -263,8 +276,26 @@ function runServer (argv, ops = {}) {
   server.on('connection', function (socket) {
     debug(new Date(), 'Connection from ' + socket.remoteAddress + ':' + socket.remotePort)
 
+    const socketCtx = { firmwareMode: false, isEncrypted: false, buffer: Buffer.alloc(0), expectedSize: null }
+
     socket.on('data', async function (chunk) {
-      await processCmd(socket, chunk)
+      if (socketCtx.firmwareMode) {
+        socketCtx.buffer = Buffer.concat([socketCtx.buffer, chunk])
+
+        if (socketCtx.expectedSize === null && socketCtx.buffer.length >= 4) {
+          socketCtx.expectedSize = socketCtx.buffer.readInt32LE(0)
+          socketCtx.buffer = socketCtx.buffer.subarray(4)
+        }
+
+        if (socketCtx.expectedSize !== null && socketCtx.buffer.length >= socketCtx.expectedSize) {
+          socketCtx.firmwareMode = false
+          const resp = { STATUS: 'S', When: +new Date(), Code: 131, Msg: 'Updated', Description: '' }
+          await sendResponse(socket, resp, encryptionKey, socketCtx.isEncrypted, CTX.delay)
+        }
+        return
+      }
+
+      await processCmd(socket, chunk, socketCtx)
     })
   })
 

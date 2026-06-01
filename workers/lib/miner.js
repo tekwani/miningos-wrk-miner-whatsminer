@@ -717,8 +717,14 @@ class WhatsminerMiner extends BaseMiner {
     }
   }
 
-  async updateFirmware (firmware) {
+  async searchFirmwareById (id) {
+    if (!this.opts?.findFirmware) throw new Error('ERR_FIRMWARE_LOOKUP_NOT_AVAILABLE')
+    return await this.opts.findFirmware(id)
+  }
+
+  async updateFirmware (firmwareId) {
     try {
+      const firmware = await this.searchFirmwareById(firmwareId)
       const res = await this._requestWriteFirmwareEndpoint(firmware)
       return { data: res }
     } catch (e) {

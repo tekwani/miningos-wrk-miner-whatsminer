@@ -41,11 +41,11 @@ function _readCombineFirmwareToBuffer (fw) {
   return ret
 }
 
-function readFirmware (chip, fw) {
+function readFirmware (platform, fw) {
   const ret = _readCombineFirmwareToBuffer(fw)
   if (ret.length > 0) {
     const correctUpdate = ret.find((item) => {
-      return item.chip === chip
+      return item.platform === platform
     })
     if (correctUpdate) {
       return {
