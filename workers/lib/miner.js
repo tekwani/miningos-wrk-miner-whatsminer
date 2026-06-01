@@ -3,6 +3,8 @@
 const BaseMiner = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/base')
 const async = require('async')
 const net = require('node:net')
+const fs = require('node:fs')
+const path = require('node:path')
 const CryptoJS = require('crypto-js')
 const hex2a = require('./utils/hex2a')
 const readFirmware = require('./utils/firmware')
@@ -20,8 +22,9 @@ function isResOK (res) {
 }
 
 class WhatsminerMiner extends BaseMiner {
-  constructor ({ socketer, apiVersion, ...opts }) {
+  constructor ({ socketer, apiVersion, getLogCoreManager, ...opts }) {
     super(opts)
+    this._getLogCoreManager = getLogCoreManager || (() => null)
 
     this.rpc = socketer.rpc({
       tcpOpts: {
@@ -218,6 +221,160 @@ class WhatsminerMiner extends BaseMiner {
     return res
   }
 
+  async _requestDownloadLogs () {
+    const TOKEN_EXPIRED_CODE = 135
+    const MAX_ATTEMPTS = 2
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (!this.token) {
+        await this._refreshToken()
+      }
+
+      const downloadCmd = this.protocolHandler.transformCommand('download_logs')
+      let encCmd, decryptionKey
+
+      if (this.apiVersion === API_VERSIONS.V3) {
+        const tokenInfo = this.protocolHandler.generateTokenInfo(downloadCmd)
+        const { token, key } = tokenInfo
+        const ts = Math.floor(Date.now() / 1000)
+        const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: 'super' })
+        const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+        encCmd = JSON.stringify({ enc: 1, data })
+        decryptionKey = key
+      } else {
+        const tokenInfo = this.protocolHandler.getTokenInfo()
+        const { sign, key } = tokenInfo
+        const cmd = JSON.stringify({ token: sign, cmd: downloadCmd })
+        const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+        encCmd = JSON.stringify({ enc: 1, data })
+        decryptionKey = key
+      }
+
+      try {
+        return await this._socketDownloadLogs(encCmd, decryptionKey)
+      } catch (err) {
+        // V2 tokens expire mid-session; clear and retry once with a fresh token.
+        // V3 generates per-command tokens so expiry cannot occur there.
+        if (err.responseCode === TOKEN_EXPIRED_CODE && attempt === 0 && this.apiVersion !== API_VERSIONS.V3) {
+          this.token = undefined
+          continue
+        }
+        throw err
+      }
+    }
+  }
+
+  _socketDownloadLogs (encCmd, decryptionKey) {
+    return new Promise((resolve, reject) => {
+      const socket = new net.Socket()
+      let phase = 'text'
+      let logFileLen = 0
+      const chunks = []
+      let receivedLen = 0
+
+      socket.connect(this.opts.port, this.opts.address, () => {
+        socket.write(encCmd)
+      })
+
+      socket.on('data', (data) => {
+        if (phase === 'text') {
+          let resp
+          try {
+            const decoded = JSON.parse(data.toString())
+            if (decoded.enc) {
+              const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(decryptionKey), { mode: CryptoJS.mode.ECB }).toString()
+              resp = JSON.parse(hex2a(decrypted))
+            } else {
+              resp = decoded
+            }
+          } catch (e) {
+            socket.destroy()
+            reject(new Error('ERR_DOWNLOAD_LOGS_PARSE_FAILED'))
+            return
+          }
+
+          const isOk = this.protocolHandler.isResponseOK(resp)
+          if (!isOk) {
+            socket.destroy()
+            const code = resp.Code || resp.code
+            const err = new Error(`ERR_DOWNLOAD_LOGS_FAILED: Code ${code}`)
+            err.responseCode = code
+            reject(err)
+            return
+          }
+
+          const msg = resp.Msg || resp.msg || {}
+          logFileLen = parseInt(msg.logfilelen || msg.logsize || '0')
+          if (!logFileLen || logFileLen <= 0) {
+            socket.destroy()
+            reject(new Error('ERR_DOWNLOAD_LOGS_EMPTY'))
+            return
+          }
+          phase = 'binary'
+        } else {
+          chunks.push(data)
+          receivedLen += data.length
+          if (receivedLen >= logFileLen) {
+            socket.destroy()
+            const logBuffer = Buffer.concat(chunks, logFileLen)
+            resolve({ logFileLen, logBuffer })
+          }
+        }
+      })
+
+      socket.on('end', () => {
+        if (phase === 'binary' && chunks.length > 0) {
+          const logBuffer = Buffer.concat(chunks)
+          resolve({ logFileLen: logBuffer.length, logBuffer })
+        }
+      })
+
+      socket.on('error', (error) => { reject(error) })
+
+      socket.setTimeout(60000, () => {
+        socket.destroy()
+        reject(new Error('ERR_DOWNLOAD_LOGS_TIMEOUT'))
+      })
+    })
+  }
+
+  async downloadLogs () {
+    try {
+      const result = await this._requestDownloadLogs()
+      const { logBuffer } = result
+
+      // Serve the raw binary via Hypercore/Hyperswarm (data plane).
+      // Only tiny metadata is returned through HRPC (signal plane).
+      const logCoreManager = this._getLogCoreManager()
+      if (!logCoreManager) throw new Error('ERR_LOG_CORE_MANAGER_NOT_READY')
+      const meta = await logCoreManager.serveLog(logBuffer, this.opts.id)
+
+      // Also write a local debug file (metadata only, not raw bytes)
+      this._saveResponseFile(meta)
+
+      return { success: true, data: meta }
+    } catch (e) {
+      this.debugError('downloadLogs error', e)
+      return { success: false, error_msg: e.message }
+    }
+  }
+
+  _saveResponseFile (meta) {
+    try {
+      const logsDir = path.join(process.cwd(), 'logs')
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true })
+      }
+      const fileName = `download-logs-${this.opts.id || this.opts.address}-${Date.now()}.txt`
+      fs.writeFileSync(
+        path.join(logsDir, fileName),
+        JSON.stringify(meta, null, 2)
+      )
+    } catch (fileErr) {
+      this.debugError('downloadLogs failed to save response file', fileErr)
+    }
+  }
+
   validateWriteAction (...params) {
     const [action, ...args] = params
 
@@ -226,6 +383,10 @@ class WhatsminerMiner extends BaseMiner {
       if (!['low', 'normal', 'high', 'sleep'].includes(mode)) {
         throw new Error('ERR_SET_POWER_MODE_INVALID')
       }
+      return 1
+    }
+
+    if (action === 'downloadLogs') {
       return 1
     }
 

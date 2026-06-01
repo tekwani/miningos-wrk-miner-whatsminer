@@ -67,7 +67,8 @@ const COMMAND_MAP_V3 = {
   disable_btminer_fast_boot: 'set.miner.fastboot',
   enable_web_pools: 'set.miner.web_pools',
   disable_web_pools: 'set.miner.web_pools',
-  net_config: 'set.network.config'
+  net_config: 'set.network.config',
+  download_logs: 'get.log.download'
 }
 
 // V3-only commands (no V2 equivalent)

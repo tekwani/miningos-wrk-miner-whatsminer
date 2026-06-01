@@ -4,6 +4,7 @@ const WrkRack = require('@tetherto/miningos-tpl-wrk-miner/workers/rack.miner.wrk
 const Miner = require('./miner.js')
 const TcpFacility = require('@tetherto/svc-facs-tcp')
 const async = require('async')
+const LogCoreManager = require('./log-core-manager')
 const path = require('path')
 
 const DEFAULT_PORT = 4028
@@ -23,13 +24,32 @@ class WrkMinerRack extends WrkRack {
     async.series([
       (next) => { super._start(next) },
       (next) => {
+        // Facilities are ready after super._start — construct LogCoreManager here
+        // so it can receive live net_r0 and store_s0 facility references.
+        const logCoreCfg = this.conf?.thing?.miner?.logCoreManager || {}
+        this.logCoreManager = new LogCoreManager({
+          netFac: this.net_r0,
+          storeFac: this.store_s0,
+          ttlMs: logCoreCfg.ttlMs
+        })
+
         this._addWhitelistedActions([
-          ['setPowerPct', 1]
+          ['setPowerPct', 1],
+          ['downloadLogs', 1]
         ])
 
         next()
       }
     ], cb)
+  }
+
+  async _stop (cb) {
+    try {
+      await this.logCoreManager?.cleanupAll()
+    } catch (e) {
+      this.debugError('logCoreManager cleanupAll error', e)
+    }
+    super._stop(cb)
   }
 
   getThingType () {
@@ -108,6 +128,7 @@ class WrkMinerRack extends WrkRack {
       id: thg.id,
       nominalEfficiencyWThs: this.getNominalEficiencyWThs(),
       type: thg.type,
+      getLogCoreManager: () => this.logCoreManager,
       findFirmware: this.getFirmwareById.bind(this)
     })
 

@@ -1,9 +1,9 @@
 'use strict'
 
-const { createV3SuccessResponse } = require('../utils')
+const { createSuccessResponse } = require('../utils')
 
 /**
- * V3 API get.log.download command handler
+ * V2 API download_logs command handler
  * Packages system logs and returns size for streaming
  * Returns a _binaryPayload that the mock server sends after the JSON response
  */
@@ -20,9 +20,9 @@ module.exports = function (ctx, state) {
     '--- End of Log ---\n'
   )
 
-  const response = createV3SuccessResponse({
+  const response = createSuccessResponse({
     logfilelen: mockLogContent.length.toString()
-  }, 'get.log.download')
+  })
 
   response._binaryPayload = mockLogContent
 

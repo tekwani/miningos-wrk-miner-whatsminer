@@ -20,7 +20,7 @@ const DEFAULT_NOMINAL_EFFICIENCY_WTHS = {
 
 const MINER_COOLING_TYPE_MAP = {
   HYDRO: ['m63', 'm53s'],
-  IMMERSION: ['m56s'],
+  IMMERSION: ['m56s', 'm63spp'],
   AIR: ['m30sp', 'm30spp']
 }
 

@@ -246,6 +246,27 @@ function runServer (argv, ops = {}) {
         return
       }
 
+      // Handle two-phase responses (e.g., download_logs)
+      // The command handler attaches _binaryPayload for data that should be
+      // sent as raw bytes after the JSON response (matching real hardware behavior)
+      if (res._binaryPayload) {
+        const binaryData = res._binaryPayload
+        delete res._binaryPayload
+
+        if (CTX.delay) await promiseSleep(CTX.delay)
+
+        if (isEncrypted) {
+          socket.write(encryptResponse(res, encryptionKey))
+        } else {
+          socket.write(JSON.stringify(res))
+        }
+
+        await promiseSleep(10)
+        socket.write(binaryData)
+        socket.destroy()
+        return
+      }
+
       // Firmware transfer: respond with "ready" and keep socket open to receive binary data
       if (res.__firmwareReady) {
         const readyResp = { STATUS: 'S', When: +new Date(), Code: 131, Msg: 'ready', Description: '' }
