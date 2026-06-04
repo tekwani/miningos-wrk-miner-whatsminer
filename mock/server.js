@@ -13,7 +13,7 @@ const { promiseSleep } = require('@bitfinex/lib-js-util-promise')
 const md5 = require('../workers/lib/utils/md5')
 
 const ENCRYPTION_KEY = 'x5JSSQzqF0lEACIGSL0Ld1'
-const MINER_TYPES = ['m63', 'm56s', 'm53s', 'm30sp', 'm30spp']
+const MINER_TYPES = ['m63', 'm56s', 'm53s', 'm30sp', 'm30spp', 'm63spp']
 const SALT = '5QAHiKMb'
 
 /**
@@ -168,8 +168,8 @@ function runServer (argv, ops = {}) {
     throw Error('ERR_UNSUPPORTED')
   }
 
-  // Load initial state
-  const statePaths = ['./initial_states/default', `./initial_states/${CTX.type.toLowerCase()}`]
+  // Load initial state (model-specific takes priority over default)
+  const statePaths = [`./initial_states/${CTX.type.toLowerCase()}`, './initial_states/default']
   const statePath = findExistingPath(statePaths)
 
   if (!statePath) {
