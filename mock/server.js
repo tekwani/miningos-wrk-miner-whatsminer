@@ -12,7 +12,6 @@ const MockControlAgent = require('./mock-control-agent')
 const { promiseSleep } = require('@bitfinex/lib-js-util-promise')
 const md5 = require('../workers/lib/utils/md5')
 
-const ENCRYPTION_KEY = 'x5JSSQzqF0lEACIGSL0Ld1'
 const MINER_TYPES = ['m63', 'm56s', 'm53s', 'm30sp', 'm30spp', 'm63spp']
 const SALT = '5QAHiKMb'
 
@@ -20,7 +19,6 @@ const SALT = '5QAHiKMb'
  * Generates encryption key from password (V2 - MD5 based)
  */
 const generateEncryptionKeyV2 = (password) => {
-  if (!password) return ENCRYPTION_KEY
   const key = md5.crypt(password, SALT)
   const arr = key.split('$')
   return arr[arr.length - 1]
@@ -30,7 +28,6 @@ const generateEncryptionKeyV2 = (password) => {
  * Generates encryption key from password (V3 - SHA256 based)
  */
 const generateEncryptionKeyV3 = (password) => {
-  if (!password) return ENCRYPTION_KEY
   // V3 uses SHA256(password + salt)
   return CryptoJS.SHA256(password + SALT).toString()
 }

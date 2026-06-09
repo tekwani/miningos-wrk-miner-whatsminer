@@ -54,11 +54,10 @@ const execute = async () => {
     }
     // Give time for connections to close
     await new Promise(resolve => setTimeout(resolve, 2000))
-    process.exit(0)
   }
 }
 
 execute().catch(err => {
   console.error(err)
-  process.exit(1)
+  process.exitCode = 1
 })

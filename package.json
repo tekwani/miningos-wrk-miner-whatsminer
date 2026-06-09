@@ -25,13 +25,15 @@
     "test:integration:v3": "NODE_ENV=test brittle ./tests/integration/protocols-v3.test.js",
     "test:integration:compare": "NODE_ENV=test brittle ./tests/integration/protocols-compare.test.js",
     "test:integration:all": "npm run test:integration && npm run test:integration:protocols",
-    "test:coverage": "brittle --coverage tests/{,**/}*.test.js"
+    "test:coverage": "brittle --coverage tests/unit/*.js",
+    "dev": "node worker.js --wtype wrk-miner-rack-m56s --env production --rack rack-1",
+    "mock": "node mock/server.js --type M56s -p 8080 -h 0.0.0.0"
   },
   "dependencies": {
     "@bitfinex/bfx-svc-boot-js": "1.2.0",
     "@tetherto/miningos-lib-stats": "git+https://github.com/tetherto/miningos-lib-stats.git",
     "@tetherto/miningos-tpl-wrk-miner": "git+https://github.com/tetherto/miningos-tpl-wrk-miner.git",
-    "@tetherto/svc-facs-tcp": "git+https://github.com/tetherto/svc-facs-tcp.git",
+    "@tetherto/svc-facs-tcp": "git+https://github.com/tetherto/svc-facs-tcp.git#v1.0.0",
     "async": "3.2.6",
     "crypto-js": "4.2.0",
     "debug": "4.4.1"
