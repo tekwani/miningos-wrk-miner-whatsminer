@@ -12,13 +12,41 @@ const { getErrorMsg } = require('./utils')
 const {
   MINOR_ERROR_CODES_M56S_M30_SET,
   MINOR_ERROR_CODES_M53_SET,
-  MINER_COOLING_TYPE_MAP
+  MINER_COOLING_TYPE_MAP,
+  DOWNLOAD_LOGS
 } = require('./constants')
+const { RESPONSE_CODES_V2 } = require('./protocols/constants')
 const { STATUS, POWER_MODE } = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/constants')
 const { ApiHandlerFactory, API_VERSIONS } = require('./protocols')
 
 function isResOK (res) {
   return res?.Code === 131
+}
+
+/**
+ * Returns the index just past the first complete JSON object in buf
+ * (string-aware brace scan), or -1 if incomplete.
+ */
+function findJsonObjectEnd (buf) {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < buf.length; i++) {
+    const c = buf[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (c === 0x5c) escaped = true // backslash
+      else if (c === 0x22) inString = false // quote
+      continue
+    }
+    if (c === 0x22) inString = true
+    else if (c === 0x7b) depth++
+    else if (c === 0x7d) {
+      depth--
+      if (depth === 0) return i + 1
+    }
+  }
+  return -1
 }
 
 class WhatsminerMiner extends BaseMiner {
@@ -222,118 +250,186 @@ class WhatsminerMiner extends BaseMiner {
   }
 
   async _requestDownloadLogs () {
-    const TOKEN_EXPIRED_CODE = 135
-    const MAX_ATTEMPTS = 2
+    let tokenRefreshed = false
+    let lastErr = null
 
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= DOWNLOAD_LOGS.MAX_ATTEMPTS; attempt++) {
       if (!this.token) {
         await this._refreshToken()
       }
 
-      const downloadCmd = this.protocolHandler.transformCommand('download_logs')
-      let encCmd, decryptionKey
-
-      if (this.apiVersion === API_VERSIONS.V3) {
-        const tokenInfo = this.protocolHandler.generateTokenInfo(downloadCmd)
-        const { token, key } = tokenInfo
-        const ts = Math.floor(Date.now() / 1000)
-        const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: 'super' })
-        const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
-        encCmd = JSON.stringify({ enc: 1, data })
-        decryptionKey = key
-      } else {
-        const tokenInfo = this.protocolHandler.getTokenInfo()
-        const { sign, key } = tokenInfo
-        const cmd = JSON.stringify({ token: sign, cmd: downloadCmd })
-        const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
-        encCmd = JSON.stringify({ enc: 1, data })
-        decryptionKey = key
-      }
+      const { encCmd, decryptionKey } = this._buildDownloadLogsCmd()
 
       try {
         return await this._socketDownloadLogs(encCmd, decryptionKey)
       } catch (err) {
         // V2 tokens expire mid-session; clear and retry once with a fresh token.
         // V3 generates per-command tokens so expiry cannot occur there.
-        if (err.responseCode === TOKEN_EXPIRED_CODE && attempt === 0 && this.apiVersion !== API_VERSIONS.V3) {
+        if (err.responseCode === RESPONSE_CODES_V2.TOKEN_EXPIRED && !tokenRefreshed && this.apiVersion !== API_VERSIONS.V3) {
+          tokenRefreshed = true
           this.token = undefined
+          attempt-- // token refresh does not consume a transfer attempt
           continue
         }
-        throw err
+
+        lastErr = err
+        if (attempt === DOWNLOAD_LOGS.MAX_ATTEMPTS || !this._isTransientDownloadError(err)) {
+          throw err
+        }
+        this.debugError(`downloadLogs attempt ${attempt} failed (${err.message}), retrying`)
+        await new Promise(resolve => setTimeout(resolve, DOWNLOAD_LOGS.RETRY_BACKOFF_MS * attempt))
       }
     }
+
+    throw lastErr
   }
 
+  _buildDownloadLogsCmd () {
+    const downloadCmd = this.protocolHandler.transformCommand('download_logs')
+
+    if (this.apiVersion === API_VERSIONS.V3) {
+      const { token, key } = this.protocolHandler.generateTokenInfo(downloadCmd)
+      const ts = Math.floor(Date.now() / 1000)
+      const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: 'super' })
+      const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+      return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
+    }
+
+    const { sign, key } = this.protocolHandler.getTokenInfo()
+    const cmd = JSON.stringify({ token: sign, cmd: downloadCmd })
+    const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+    return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
+  }
+
+  // Retryable failures; miner verdicts (error code, empty log) and timeouts are not
+  _isTransientDownloadError (err) {
+    if (/^ERR_DOWNLOAD_LOGS_(INCOMPLETE|PARSE_FAILED|CONNECT_FAILED)/.test(err.message)) return true
+    return ['ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH'].includes(err.code)
+  }
+
+  /**
+   * Two-phase download_logs exchange: a JSON header ({ logfilelen }) followed
+   * by the raw binary log on the same socket. The header may arrive split
+   * across segments or coalesced with leading binary bytes, so it is buffered
+   * until one complete JSON object parses; the rest is binary payload.
+   */
   _socketDownloadLogs (encCmd, decryptionKey) {
+    const timeoutMs = this.conf.downloadLogsTimeoutMs || DOWNLOAD_LOGS.SOCKET_TIMEOUT_MS
+
     return new Promise((resolve, reject) => {
       const socket = new net.Socket()
-      let phase = 'text'
+      let headerBuf = Buffer.alloc(0)
+      let headerDone = false
       let logFileLen = 0
       const chunks = []
       let receivedLen = 0
+      let settled = false
 
-      socket.connect(this.opts.port, this.opts.address, () => {
-        socket.write(encCmd)
-      })
+      const settle = (err, res) => {
+        if (settled) return
+        settled = true
+        socket.destroy()
+        if (err) reject(err)
+        else resolve(res)
+      }
+
+      const maybeComplete = () => {
+        if (receivedLen < logFileLen) return
+        const logBuffer = Buffer.concat(chunks, receivedLen).subarray(0, logFileLen)
+        settle(null, { logFileLen, logBuffer })
+      }
+
+      const enterBinaryPhase = (initial) => {
+        headerDone = true
+        if (initial.length) {
+          chunks.push(initial)
+          receivedLen = initial.length
+        }
+        maybeComplete()
+      }
+
+      const parseHeader = (isFinal) => {
+        let start = 0
+        while (start < headerBuf.length && [0x20, 0x09, 0x0a, 0x0d].includes(headerBuf[start])) start++
+        if (start < headerBuf.length && headerBuf[start] !== 0x7b) { // not '{'
+          return settle(new Error('ERR_DOWNLOAD_LOGS_PARSE_FAILED'))
+        }
+
+        const end = findJsonObjectEnd(headerBuf.subarray(start))
+        if (end === -1) {
+          if (isFinal || headerBuf.length > DOWNLOAD_LOGS.MAX_HEADER_BYTES) {
+            settle(new Error('ERR_DOWNLOAD_LOGS_PARSE_FAILED'))
+          }
+          return // incomplete header — wait for more data
+        }
+
+        let resp
+        try {
+          const decoded = JSON.parse(headerBuf.subarray(start, start + end).toString())
+          if (decoded.enc) {
+            const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(decryptionKey), { mode: CryptoJS.mode.ECB }).toString()
+            resp = JSON.parse(hex2a(decrypted))
+          } else {
+            resp = decoded
+          }
+        } catch (e) {
+          return settle(new Error('ERR_DOWNLOAD_LOGS_PARSE_FAILED'))
+        }
+
+        if (!this.protocolHandler.isResponseOK(resp)) {
+          const code = resp.Code ?? resp.code
+          const err = new Error(`ERR_DOWNLOAD_LOGS_FAILED: Code ${code}`)
+          err.responseCode = code
+          return settle(err)
+        }
+
+        const msg = resp.Msg || resp.msg || {}
+        logFileLen = parseInt(msg.logfilelen || msg.logsize || '0')
+        if (!logFileLen || logFileLen <= 0) {
+          return settle(new Error('ERR_DOWNLOAD_LOGS_EMPTY'))
+        }
+
+        enterBinaryPhase(headerBuf.subarray(start + end))
+      }
 
       socket.on('data', (data) => {
-        if (phase === 'text') {
-          let resp
-          try {
-            const decoded = JSON.parse(data.toString())
-            if (decoded.enc) {
-              const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(decryptionKey), { mode: CryptoJS.mode.ECB }).toString()
-              resp = JSON.parse(hex2a(decrypted))
-            } else {
-              resp = decoded
-            }
-          } catch (e) {
-            socket.destroy()
-            reject(new Error('ERR_DOWNLOAD_LOGS_PARSE_FAILED'))
-            return
-          }
-
-          const isOk = this.protocolHandler.isResponseOK(resp)
-          if (!isOk) {
-            socket.destroy()
-            const code = resp.Code || resp.code
-            const err = new Error(`ERR_DOWNLOAD_LOGS_FAILED: Code ${code}`)
-            err.responseCode = code
-            reject(err)
-            return
-          }
-
-          const msg = resp.Msg || resp.msg || {}
-          logFileLen = parseInt(msg.logfilelen || msg.logsize || '0')
-          if (!logFileLen || logFileLen <= 0) {
-            socket.destroy()
-            reject(new Error('ERR_DOWNLOAD_LOGS_EMPTY'))
-            return
-          }
-          phase = 'binary'
+        if (settled) return
+        if (!headerDone) {
+          headerBuf = headerBuf.length ? Buffer.concat([headerBuf, data]) : data
+          parseHeader(false)
         } else {
           chunks.push(data)
           receivedLen += data.length
-          if (receivedLen >= logFileLen) {
-            socket.destroy()
-            const logBuffer = Buffer.concat(chunks, logFileLen)
-            resolve({ logFileLen, logBuffer })
-          }
+          maybeComplete()
         }
       })
 
       socket.on('end', () => {
-        if (phase === 'binary' && chunks.length > 0) {
-          const logBuffer = Buffer.concat(chunks)
-          resolve({ logFileLen: logBuffer.length, logBuffer })
+        if (settled) return
+        if (!headerDone && headerBuf.length) {
+          parseHeader(true)
+          if (settled) return
         }
+        settle(new Error(`ERR_DOWNLOAD_LOGS_INCOMPLETE: connection ended after ${receivedLen}/${logFileLen} bytes`))
       })
 
-      socket.on('error', (error) => { reject(error) })
+      socket.on('close', () => {
+        settle(new Error(`ERR_DOWNLOAD_LOGS_INCOMPLETE: connection closed after ${receivedLen}/${logFileLen} bytes`))
+      })
 
-      socket.setTimeout(60000, () => {
-        socket.destroy()
-        reject(new Error('ERR_DOWNLOAD_LOGS_TIMEOUT'))
+      socket.on('error', (error) => {
+        const prefix = headerDone ? 'ERR_DOWNLOAD_LOGS_INCOMPLETE' : 'ERR_DOWNLOAD_LOGS_CONNECT_FAILED'
+        const err = new Error(`${prefix}: ${error.message}`)
+        err.code = error.code
+        settle(err)
+      })
+
+      socket.setTimeout(timeoutMs, () => {
+        settle(new Error('ERR_DOWNLOAD_LOGS_TIMEOUT'))
+      })
+
+      socket.connect(this.opts.port, this.opts.address, () => {
+        socket.write(encCmd)
       })
     })
   }

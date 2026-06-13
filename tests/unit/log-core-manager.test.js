@@ -204,6 +204,46 @@ test('LogCoreManager - serveLog registers core in internal map', async (t) => {
   t.pass()
 })
 
+test('LogCoreManager - serveLog replicates new core onto existing swarm connections', async (t) => {
+  // Hyperswarm reuses peer connections across topics — no 'connection' event fires
+  const swarm = makeSwarm()
+  const existingSocket = { id: 'existing-peer-socket' }
+  swarm.connections = new Set([existingSocket])
+  const netFac = { get swarm () { return swarm }, startSwarm: async () => {} }
+
+  const replicated = []
+  const core = makeCore()
+  core.replicate = (socket) => replicated.push(socket)
+  const storeFac = { getCore: () => core }
+
+  const mgr = new LogCoreManager({ netFac, storeFac })
+  await mgr.serveLog(Buffer.from('log data'), 'miner-001')
+
+  t.is(replicated.length, 1, 'should replicate the new core onto the existing connection')
+  t.ok(replicated[0] === existingSocket, 'should replicate onto the existing socket')
+  t.pass()
+})
+
+test('LogCoreManager - core is not replicated twice on the same socket', async (t) => {
+  const swarm = makeSwarm()
+  const existingSocket = { id: 'peer-socket' }
+  swarm.connections = new Set([existingSocket])
+  const netFac = { get swarm () { return swarm }, startSwarm: async () => {} }
+
+  const replicated = []
+  const core = makeCore()
+  core.replicate = (socket) => replicated.push(socket)
+  const storeFac = { getCore: () => core }
+
+  const mgr = new LogCoreManager({ netFac, storeFac })
+  await mgr.serveLog(Buffer.from('log data'), 'miner-001')
+
+  swarm.emit('connection', existingSocket)
+
+  t.is(replicated.length, 1, 'should not replicate the same core twice on one socket')
+  t.pass()
+})
+
 test('LogCoreManager - serveLog multiple calls produce distinct cores', async (t) => {
   const swarm = makeSwarm()
   const netFac = { get swarm () { return swarm }, startSwarm: async () => {} }

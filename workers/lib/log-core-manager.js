@@ -48,9 +48,17 @@ class LogCoreManager {
     // on distinct sockets.
     this._netFac.swarm.on('connection', (socket) => {
       for (const [, entry] of this._cores) {
-        entry.core.replicate(socket)
+        this._replicateCore(entry, socket)
       }
     })
+  }
+
+  // Replicates a core onto a socket exactly once. Hyperswarm reuses peer
+  // connections across topics, so new cores must also reach open sockets.
+  _replicateCore (entry, socket) {
+    if (entry.seenSockets.has(socket)) return
+    entry.seenSockets.add(socket)
+    entry.core.replicate(socket)
   }
 
   /**
@@ -81,16 +89,22 @@ class LogCoreManager {
     const discoveryKeyHex = core.discoveryKey.toString('hex')
     const expiresAt = Date.now() + this._ttlMs
 
+    // Register before announcing and replicate onto already-open peer sockets
+    // (no 'connection' event fires for reused connections)
+    const entry = { core, discovery: null, timerId: null, seenSockets: new WeakSet() }
+    this._cores.set(coreKeyHex, entry)
+    for (const socket of this._netFac.swarm.connections || []) {
+      this._replicateCore(entry, socket)
+    }
+
     // Announce on the DHT so the app-node reader can find this worker
-    const discovery = this._netFac.swarm.join(core.discoveryKey, { server: true, client: false })
-    await discovery.flushed()
+    entry.discovery = this._netFac.swarm.join(core.discoveryKey, { server: true, client: false })
+    await entry.discovery.flushed()
 
     // Auto-cleanup after TTL. unref() so a pending timer does not prevent process exit.
-    const timerId = setTimeout(() => {
+    entry.timerId = setTimeout(() => {
       this.cleanup(coreKeyHex).catch(() => {})
     }, this._ttlMs).unref()
-
-    this._cores.set(coreKeyHex, { core, discovery, timerId })
 
     return {
       coreKey: coreKeyHex,
