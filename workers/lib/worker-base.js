@@ -6,6 +6,7 @@ const TcpFacility = require('@tetherto/svc-facs-tcp')
 const async = require('async')
 const LogCoreManager = require('./log-core-manager')
 const path = require('path')
+const fs = require('fs/promises')
 
 const DEFAULT_PORT = 4028
 const { DEFAULT_NOMINAL_EFFICIENCY_WTHS } = require('./constants')
@@ -153,7 +154,15 @@ class WrkMinerRack extends WrkRack {
     const firmware = firmwares.find((fw) => fw.id === id)
     if (!firmware) throw new Error('ERR_FIRMWARE_NOT_FOUND')
     const dir = this.conf.thing.dirFirmwares || 'firmwares'
-    return path.join(dir, firmware.file)
+    const filePath = path.join(dir, firmware.file)
+
+    try {
+      await fs.access(filePath)
+    } catch {
+      throw new Error('ERR_FIRMWARE_FILE_NOT_FOUND')
+    }
+
+    return filePath
   }
 }
 

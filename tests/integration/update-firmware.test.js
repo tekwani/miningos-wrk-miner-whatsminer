@@ -58,9 +58,7 @@ test('updateFirmware - success', async (t) => {
   const result = await miner.updateFirmware(FIRMWARE_ID)
 
   t.ok(result, 'should return result')
-  t.ok(result.data, 'should have data')
-  t.is(result.data.Code, 131, 'should have success code')
-  t.is(result.data.Msg, 'Updated', 'should report updated')
+  t.is(result.success, true, 'should indicate success')
 })
 
 test('updateFirmware - firmware not found returns error', async (t) => {

@@ -180,20 +180,36 @@ class WhatsminerMiner extends BaseMiner {
       })
 
       socket.on('data', (data) => {
-        const decoded = JSON.parse(data)
-        const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
-        const resp = JSON.parse(hex2a(decrypted))
-        if (isResOK(resp) && resp.Msg === 'ready') {
-          const fw = readFirmware(platform, file)
-          if (fw === null) reject(Error('ERR_INVALID_FIRMWARE'))
-          const fileSizeInBytes = Buffer.alloc(4)
-          fileSizeInBytes.writeInt32LE(fw.size, 0)
-          socket.write(fileSizeInBytes, () => {
-            socket.write(fw.content)
-          })
-        } else if (isResOK(resp)) {
+        try {
+          const decoded = JSON.parse(data)
+          const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+          const resp = JSON.parse(hex2a(decrypted))
+          if (isResOK(resp) && resp.Msg === 'ready') {
+            let fw
+            try {
+              fw = readFirmware(platform, file)
+            } catch (e) {
+              socket.destroy()
+              reject(e)
+              return
+            }
+            if (fw === null) {
+              socket.destroy()
+              reject(Error('ERR_INVALID_FIRMWARE'))
+              return
+            }
+            const fileSizeInBytes = Buffer.alloc(4)
+            fileSizeInBytes.writeInt32LE(fw.size, 0)
+            socket.write(fileSizeInBytes, () => {
+              socket.write(fw.content)
+            })
+          } else if (isResOK(resp)) {
+            socket.destroy()
+            resolve(resp)
+          }
+        } catch (e) {
           socket.destroy()
-          resolve(resp)
+          reject(e)
         }
       })
 
@@ -982,8 +998,8 @@ class WhatsminerMiner extends BaseMiner {
   async updateFirmware (firmwareId) {
     try {
       const firmware = await this.searchFirmwareById(firmwareId)
-      const res = await this._requestWriteFirmwareEndpoint(firmware)
-      return { data: res }
+      this._requestWriteFirmwareEndpoint(firmware).catch(e => this.debugError('ERR_FIRMWARE_UPDATE', e))
+      return { success: true }
     } catch (e) {
       this.debugError(e)
       return { success: false, error_msg: e.message }
