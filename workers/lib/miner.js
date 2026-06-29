@@ -954,7 +954,7 @@ class WhatsminerMiner extends BaseMiner {
       chip_temp_max: device['Chip Temp Max'],
       chip_temp_avg: device['Chip Temp Avg'],
       chip_vol_diff: device.chip_vol_diff
-    }))
+    })) || []
   }
 
   async getDevicesInfo () {
@@ -967,7 +967,7 @@ class WhatsminerMiner extends BaseMiner {
       driver: device.Driver,
       kernel: device.Kernel,
       model: device.Model
-    }))
+    })) || []
   }
 
   async getPSUInformation () {
