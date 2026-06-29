@@ -1013,7 +1013,7 @@ class WhatsminerMiner extends BaseMiner {
       const code = Object.keys(data)[0]
 
       return {
-        name: getErrorMsg(code),
+        name: getErrorMsg(code, this.opts.type),
         message: `Error code ${code}`,
         code
       }
@@ -1173,6 +1173,7 @@ class WhatsminerMiner extends BaseMiner {
   _calcHashrates (stats) {
     return {
       avg: Math.floor(parseFloat(stats.mhs_av) * 100) / 100,
+      target: Math.floor(parseFloat(stats.target_mhs) * 100) / 100,
       t_5s: Math.floor(parseFloat(stats.mhs_5s) * 100) / 100,
       t_1m: Math.floor(parseFloat(stats.mhs_1m) * 100) / 100,
       t_5m: Math.floor(parseFloat(stats.mhs_5m) * 100) / 100,
