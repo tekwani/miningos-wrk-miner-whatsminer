@@ -1,6 +1,6 @@
 {
   "name": "@tetherto/miningos-wrk-miner-whatsminer",
-  "version": "0.0.1",
+  "version": "1.1.0",
   "description": "MiningOS Worker Miner Whatsminer",
   "keywords": [
     "tether"
@@ -11,8 +11,22 @@
     "type": "git",
     "url": "git+https://github.com/tetherto/miningos-wrk-miner-whatsminer.git"
   },
-  "engine": {
-    "node": ">=20.0"
+  "homepage": "https://github.com/tetherto/miningos-wrk-miner-whatsminer#readme",
+  "bugs": {
+    "url": "https://github.com/tetherto/miningos-wrk-miner-whatsminer/issues"
+  },
+  "engines": {
+    "node": ">=24.0"
+  },
+  "files": [
+    "worker.js",
+    "workers/",
+    "mock/"
+  ],
+  "main": "worker.js",
+  "type": "commonjs",
+  "bin": {
+    "miningos-wrk-miner-whatsminer": "worker.js"
   },
   "scripts": {
     "lint": "standard",
@@ -46,8 +60,5 @@
     "brittle": "3.16.3",
     "standard": "17.1.2",
     "yargs": "17.7.2"
-  },
-  "engines": {
-    "node": ">=24"
   }
 }
