@@ -25,11 +25,19 @@ const MINER_COOLING_TYPE_MAP = {
   AIR: ['m30sp', 'm30spp']
 }
 
+const DOWNLOAD_LOGS = {
+  SOCKET_TIMEOUT_MS: 60000,
+  MAX_HEADER_BYTES: 64 * 1024, // JSON header larger than this is malformed
+  MAX_ATTEMPTS: 3, // bounded retries for transient failures
+  RETRY_BACKOFF_MS: 200
+}
+
 module.exports = {
   MINOR_ERROR_CODES_M56S_M30_SET,
   MINOR_ERROR_CODES_M53_SET,
   DEFAULT_NOMINAL_EFFICIENCY_WTHS,
   MINER_COOLING_TYPE_MAP,
+  DOWNLOAD_LOGS,
   API_VERSIONS,
   API_DEFAULTS
 }

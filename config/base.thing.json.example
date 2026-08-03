@@ -1502,298 +1502,21 @@
     "miner-wm-m63spp": {
       "pcb_temp_warning": {
         "description": "PCB temperature too high",
-        "severity": "high",
+        "severity": "critical",
         "params": {
-          "lowTemp": 65,
-          "normalTemp": 65,
-          "highTemp": 70
+          "lowTemp": 90,
+          "normalTemp": 90,
+          "highTemp": 90
         }
       },
       "chip_temp_warning": {
         "description": "Chip temperature warning",
-        "severity": "high",
+        "severity": "critical",
         "params": {
-          "lowTemp": 80,
-          "normalTemp": 80,
-          "highTemp": 85
+          "lowTemp": 100,
+          "normalTemp": 100,
+          "highTemp": 100
         }
-      },
-      "max_inlet_temp_warning": {
-        "description": "Inlet Temperature too high",
-        "severity": "high",
-        "params": {
-          "lowTemp": 45,
-          "normalTemp": 45,
-          "highTemp": 40
-        }
-      },
-      "hashrate_low": {
-        "description": "The hash rate is below the expected level.",
-        "severity": "medium"
-      },
-      "power_init_error": {
-        "description": "Error during power initialization or power output voltage issue.",
-        "severity": "medium"
-      },
-      "power_supply_not_calibrated": {
-        "description": "Power supply is not calibrated.",
-        "severity": "medium"
-      },
-      "high_temp_protection": {
-        "description": "High-temperature protection triggered.",
-        "severity": "critical"
-      },
-      "low_temp_protection": {
-        "description": "Low-temperature protection triggered.",
-        "severity": "critical"
-      },
-      "eeprom_data_error": {
-        "description": "EEPROM data error on one or more chains.",
-        "severity": "medium"
-      },
-      "temp_sensor_error": {
-        "description": "Temperature sensor error.",
-        "severity": "critical"
-      },
-      "chip_insufficient": {
-        "description": "The number of chips is less than the design.",
-        "severity": "medium"
-      },
-      "voltage_freq_exceeds_limit": {
-        "description": "Voltage or frequency exceeds the specified limit.",
-        "severity": "medium"
-      },
-      "voltage_freq_mismatch": {
-        "description": "Voltage or frequency mismatch on one or more chains.",
-        "severity": "medium"
-      },
-      "power_probing_error": {
-        "description": "Error in power probing, no power found.",
-        "severity": "medium"
-      },
-      "power_config_mismatch": {
-        "description": "Power supply and configuration file mismatch.",
-        "severity": "medium"
-      },
-      "power_output_voltage_error": {
-        "description": "Power output voltage error.",
-        "severity": "medium"
-      },
-      "power_protecting": {
-        "description": "Power protecting state.",
-        "severity": "high"
-      },
-      "power_current_protecting": {
-        "description": "Power current protecting state.",
-        "severity": "high"
-      },
-      "power_current_error": {
-        "description": "Power current error.",
-        "severity": "medium"
-      },
-      "power_input_voltage_low": {
-        "description": "Power input voltage is low.",
-        "severity": "medium"
-      },
-      "power_input_current_protecting": {
-        "description": "Power input current protecting state.",
-        "severity": "medium"
-      },
-      "power_error_status": {
-        "description": "Power error status.",
-        "severity": "medium"
-      },
-      "power_input_voltage_current_mismatch": {
-        "description": "Power input voltage and current do not match the power.",
-        "severity": "medium"
-      },
-      "power_remained_unchanged": {
-        "description": "Power remained unchanged for a long time.",
-        "severity": "medium"
-      },
-      "power_set_enable_error": {
-        "description": "Power set enable error.",
-        "severity": "medium"
-      },
-      "power_input_voltage_low_for_high_power": {
-        "description": "Power input voltage is lower than 230V for high power mode.",
-        "severity": "medium"
-      },
-      "power_input_current_incorrect": {
-        "description": "Power input current is incorrect.",
-        "severity": "medium"
-      },
-      "power_output_over_temp_protection": {
-        "description": "Power output over-temperature protection.",
-        "severity": "medium"
-      },
-      "power_output_overcurrent_protection": {
-        "description": "Overcurrent protection of power output.",
-        "severity": "high"
-      },
-      "power_output_overvoltage_protection": {
-        "description": "Overvoltage protection of power output.",
-        "severity": "high"
-      },
-      "power_input_low_voltage_protection": {
-        "description": "Low voltage protection for power input.",
-        "severity": "high"
-      },
-      "power_output_current_imbalance": {
-        "description": "Power output current imbalance.",
-        "severity": "medium"
-      },
-      "power_input_over_temp_protection": {
-        "description": "Over-temperature protection for power input.",
-        "severity": "critical"
-      },
-      "power_input_overcurrent_protection": {
-        "description": "Overcurrent protection for power input.",
-        "severity": "high"
-      },
-      "power_input_overvoltage_protection": {
-        "description": "Overvoltage protection for power input.",
-        "severity": "high"
-      },
-      "power_input_undervoltage_protection": {
-        "description": "Undervoltage protection for power input.",
-        "severity": "high"
-      },
-      "power_over_temp_warning": {
-        "description": "Power over-temperature warning.",
-        "severity": "medium"
-      },
-      "temp_sensor_detection_error": {
-        "description": "Temperature sensor detection error.",
-        "severity": "critical"
-      },
-      "temp_reading_error": {
-        "description": "Temperature reading error.",
-        "severity": "critical"
-      },
-      "temp_protecting": {
-        "description": "Temperature protecting state.",
-        "severity": "critical"
-      },
-      "hashboard_temp_overheating": {
-        "description": "The temperature of the hashboard is overheating.",
-        "severity": "critical"
-      },
-      "env_temp_fluctuates_too_much": {
-        "description": "The environment temperature fluctuates too much.",
-        "severity": "critical"
-      },
-      "eeprom_detect_error": {
-        "description": "EEPROM detect error.",
-        "severity": "medium"
-      },
-      "eeprom_parser_error": {
-        "description": "EEPROM parser error.",
-        "severity": "medium"
-      },
-      "eeprom_xfer_error": {
-        "description": "EEPROM chip num X error.",
-        "severity": "medium"
-      },
-      "no_software_config_added": {
-        "description": "No software configuration added for the model.",
-        "severity": "medium"
-      },
-      "hashboard_error": {
-        "description": "Hashboard error.",
-        "severity": "high"
-      },
-      "env_temp_high": {
-        "description": "Environment temperature is high.",
-        "severity": "critical"
-      },
-      "high_temp_return_to_normal": {
-        "description": "If the ambient temperature is too high in high-performance mode, return to normal mode.",
-        "severity": "critical"
-      },
-      "control_board_no_support_chip": {
-        "description": "Control board does not support the chip.",
-        "severity": "medium"
-      },
-      "control_board_exception": {
-        "description": "Control board rebooted as an exception.",
-        "severity": "medium"
-      },
-      "cgminer_checksum_error": {
-        "description": "CGMiner checksum error.",
-        "severity": "medium"
-      },
-      "system_monitor_checksum_error": {
-        "description": "System monitor checksum error.",
-        "severity": "medium"
-      },
-      "remote_daemon_checksum_error": {
-        "description": "Remote daemon checksum error.",
-        "severity": "medium"
-      },
-      "air_to_liquid_pcbsn_not_match": {
-        "description": "Air to liquid PCBSN does not match.",
-        "severity": "medium"
-      },
-      "no_pool_info_configured": {
-        "description": "No pool information configured.",
-        "severity": "high"
-      },
-      "all_pools_disabled": {
-        "description": "All pools are disabled.",
-        "severity": "high"
-      },
-      "pool_connect_failed": {
-        "description": "Pool connect failed.",
-        "severity": "high"
-      },
-      "high_rejection_rate_pool": {
-        "description": "High rejection rate of the pool.",
-        "severity": "medium"
-      },
-      "pool_not_support_asicboost": {
-        "description": "The pool does not support the ASICBoost mode.",
-        "severity": "medium"
-      },
-      "switch_to_new_pool_failed": {
-        "description": "Failed to switch to a new pool.",
-        "severity": "medium"
-      },
-      "high_loss_of_hash_rate": {
-        "description": "The loss of hash rate is too high.",
-        "severity": "medium"
-      },
-      "frequency_up_timeout": {
-        "description": "Frequency up timeout.",
-        "severity": "medium"
-      },
-      "water_velocity_abnormal": {
-        "description": "Water velocity is abnormal.",
-        "severity": "high"
-      },
-      "version_low": {
-        "description": "Tool version is too low.",
-        "severity": "medium"
-      },
-      "software_version_error": {
-        "description": "Software version error.",
-        "severity": "medium"
-      },
-      "antiv_signature_illegal": {
-        "description": "Antivirus signature is illegal.",
-        "severity": "medium"
-      },
-      "antiv_dig_initd_dig_illegal": {
-        "description": "Antivirus dig initialization illegal.",
-        "severity": "medium"
-      },
-      "antiv_dig_pf_partial_dig_illegal": {
-        "description": "Antivirus dig partial dig illegal.",
-        "severity": "medium"
-      },
-      "all_pools_dead": {
-        "description": "All pools are dead.",
-        "severity": "critical"
       },
       "wrong_miner_pool": {
         "description": "Some Miner pools do not correspond to correct pool IP.",
@@ -1809,6 +1532,427 @@
       },
       "ip_worker_name": {
         "description": "Worker name corresponds to IP instead of MiningOS ID.",
+        "severity": "medium"
+      },
+      "low_power_warning": {
+        "description": "Miner power too low",
+        "severity": "critical",
+        "params": {
+          "lowPower": 80
+        }
+      },
+      "low_hashrate_warning": {
+        "description": "Miner hashrate too low",
+        "severity": "critical",
+        "params": {
+          "lowHash": 80
+        }
+      },
+      "high_efficiency_warning": {
+        "description": "Miner efficiency is too high",
+        "severity": "critical",
+        "params": {
+          "highEfficiency": 125
+        }
+      },
+      "power_probing_error": {
+        "description": "No power found, upgrade firmware or replace the PSU",
+        "severity": "medium"
+      },
+      "power_config_mismatch": {
+        "description": "Power detect error, upgrade firmware",
+        "severity": "medium"
+      },
+      "power_output_voltage_error": {
+        "description": "Power voltage error, upgrade firmware",
+        "severity": "medium"
+      },
+      "power_protecting": {
+        "description": "Power protecting, improve PSU temperature",
+        "severity": "medium"
+      },
+      "power_current_protecting": {
+        "description": "Power current protecting, improve PSU temperature",
+        "severity": "medium"
+      },
+      "power_current_error": {
+        "description": "Power current error, check whether the input voltage is stable",
+        "severity": "medium"
+      },
+      "power_input_voltage_low": {
+        "description": "Power input voltage error, improve your input voltage",
+        "severity": "medium"
+      },
+      "power_input_current_protecting": {
+        "description": "Power input current protecting, improve your input voltage",
+        "severity": "medium"
+      },
+      "power_power_error": {
+        "description": "Power power error",
+        "severity": "medium"
+      },
+      "power_voltage_offset_error": {
+        "description": "Power voltage offset error",
+        "severity": "medium"
+      },
+      "power_error_status": {
+        "description": "Power error status, please check the Errors on web page",
+        "severity": "medium"
+      },
+      "power_output_current_deviation": {
+        "description": "Power iout error, please reboot and check",
+        "severity": "medium"
+      },
+      "power_output_voltage_margin_low": {
+        "description": "The power supply output voltage margin is insufficient",
+        "severity": "medium"
+      },
+      "power_input_voltage_current_mismatch": {
+        "description": "Power iin or vin or pin error, please reboot or replace the PSU",
+        "severity": "medium"
+      },
+      "power_pin_did_not_change": {
+        "description": "Power pin did not change",
+        "severity": "medium"
+      },
+      "power_vout_set_error": {
+        "description": "Power vout set error",
+        "severity": "medium"
+      },
+      "power_remained_unchanged": {
+        "description": "Power remained unchanged for a long time",
+        "severity": "medium"
+      },
+      "power_set_enable_error": {
+        "description": "Power set enable error, please reboot and check",
+        "severity": "medium"
+      },
+      "power_input_voltage_low_for_high_power": {
+        "description": "Power input voltage is lower than 230V for High power mode",
+        "severity": "medium"
+      },
+      "power_output_over_temp_protection": {
+        "description": "Power over heat error, please improve the PSU temperature",
+        "severity": "medium"
+      },
+      "power_output_overcurrent_protection": {
+        "description": "Power over current error, please check whether the screws of power bridge are locked in place",
+        "severity": "medium"
+      },
+      "power_input_overcurrent_protection": {
+        "description": "Power over current error, please replace the PSU",
+        "severity": "medium"
+      },
+      "power_input_low_voltage_protection": {
+        "description": "Power input voltage is too low, please improve the input voltage",
+        "severity": "medium"
+      },
+      "power_input_undervoltage_protection": {
+        "description": "Power input voltage is too low, please improve the input voltage",
+        "severity": "medium"
+      },
+      "psu_fan_detection_error": {
+        "description": "PSU fan detection error",
+        "severity": "medium"
+      },
+      "power_primary_overcurrent_protection": {
+        "description": "Power over current protection, please reboot or replace the PSU",
+        "severity": "medium"
+      },
+      "power_communication_warning": {
+        "description": "Power communication error, please check whether the screws of control board are locked in place",
+        "severity": "medium"
+      },
+      "power_communication_error": {
+        "description": "Power communication error, please check whether the screws of control board are locked in place",
+        "severity": "medium"
+      },
+      "power_input_overvoltage_protection": {
+        "description": "Power input voltage is too high, please check the input voltage",
+        "severity": "medium"
+      },
+      "psu_fan_warning": {
+        "description": "PSU fan warning, please check whether PSU fan is blocked",
+        "severity": "medium"
+      },
+      "power_over_temp_warning": {
+        "description": "Power over heat error, please improve the PSU temperature",
+        "severity": "medium"
+      },
+      "power_rate_error": {
+        "description": "Power rate error",
+        "severity": "medium"
+      },
+      "temp_sensor_detection_error": {
+        "description": "Temperature sensor not found, please check the adaptor bridge and connection ribbons",
+        "severity": "medium"
+      },
+      "temp_reading_error": {
+        "description": "Temperature reading error, please check whether the screws of control board are locked in place",
+        "severity": "medium"
+      },
+      "liquid_temp_sensor_comm_error": {
+        "description": "Liquid cooling temperature sensor communication error",
+        "severity": "medium"
+      },
+      "control_board_temp_sensor_error": {
+        "description": "Control board temperature sensor communication error",
+        "severity": "medium"
+      },
+      "temp_protecting": {
+        "description": "Temperature protecting, please improve the hash board temperature",
+        "severity": "medium"
+      },
+      "hashboard_temp_overheating": {
+        "description": "The temperature of the hashboard is overheating",
+        "severity": "medium"
+      },
+      "env_temp_fluctuates_too_much": {
+        "description": "The environment temperature fluctuates too much",
+        "severity": "medium"
+      },
+      "humidity_sensor_not_found": {
+        "description": "Humidity sensor not found",
+        "severity": "medium"
+      },
+      "humidity_sensor_reading_error": {
+        "description": "Humidity sensor reading error",
+        "severity": "medium"
+      },
+      "humidity_sensor_protecting": {
+        "description": "Humidity sensor protecting",
+        "severity": "medium"
+      },
+      "eeprom_unknown_error": {
+        "description": "EEPROM unknow error",
+        "severity": "medium"
+      },
+      "eeprom_detect_error": {
+        "description": "Detect eeprom error, please check the adaptor bridge and connection ribbons",
+        "severity": "medium"
+      },
+      "eeprom_parser_error": {
+        "description": "Parser eeprom error, upgrade firmware",
+        "severity": "medium"
+      },
+      "eeprom_chip_bin_type_error": {
+        "description": "Chip bin type error",
+        "severity": "medium"
+      },
+      "eeprom_chip_num_error": {
+        "description": "EEPROM chip num error",
+        "severity": "medium"
+      },
+      "eeprom_xfer_error": {
+        "description": "EEPROM xfer error",
+        "severity": "medium"
+      },
+      "hashboard_error": {
+        "description": "Board unknow error",
+        "severity": "medium"
+      },
+      "hashboard_miner_type_error": {
+        "description": "Miner type error",
+        "severity": "medium"
+      },
+      "hashboard_bin_type_mismatch": {
+        "description": "Chip bin type is different from other",
+        "severity": "medium"
+      },
+      "hashboard_not_found": {
+        "description": "Hashboard not found.",
+        "severity": "medium"
+      },
+      "hashboard_reading_chip_id_error": {
+        "description": "Reading chip id error, please replace the adaptor bridge or ribbon",
+        "severity": "medium"
+      },
+      "hashboard_bad_chips": {
+        "description": "Hashboard have bad chips",
+        "severity": "medium"
+      },
+      "hashboard_loss_balance": {
+        "description": "Loss balance, please replace the adaptor bridge or ribbon",
+        "severity": "medium"
+      },
+      "hashboard_chip_xfer_error": {
+        "description": "Xfer error chip",
+        "severity": "medium"
+      },
+      "hashboard_reset_error": {
+        "description": "Hashboard reset error.",
+        "severity": "medium"
+      },
+      "hashboard_frequency_too_low": {
+        "description": "Hashboard frequency too low.",
+        "severity": "medium"
+      },
+      "env_temp_high": {
+        "description": "Environment temperature is high, please improve the environment temperature",
+        "severity": "medium"
+      },
+      "high_temp_return_to_normal": {
+        "description": "Environment temperature is high for high power mode",
+        "severity": "medium"
+      },
+      "liquid_cooling_temp_protection": {
+        "description": "Liquid cooling liquid temperature protection",
+        "severity": "medium"
+      },
+      "liquid_temp_fluctuation_high": {
+        "description": "The liquid temperature fluctuation is too large",
+        "severity": "medium"
+      },
+      "mac_address_invalid": {
+        "description": "MAC address invalid",
+        "severity": "medium"
+      },
+      "control_board_no_support_chip": {
+        "description": "Control board does not support the chip",
+        "severity": "medium"
+      },
+      "control_board_version_unknown": {
+        "description": "Control board version unknown",
+        "severity": "medium"
+      },
+      "control_board_exception": {
+        "description": "Control board rebooted as exception, please upgrade the firmware",
+        "severity": "medium"
+      },
+      "network_connection_unstable": {
+        "description": "The network connection is seriously unstable",
+        "severity": "medium"
+      },
+      "cgminer_checksum_error": {
+        "description": "Btminer checksum error, please re-upgrade the firmware",
+        "severity": "medium"
+      },
+      "system_monitor_checksum_error": {
+        "description": "System-monitor checksum error, please re-upgrade the firmware",
+        "severity": "medium"
+      },
+      "remote_daemon_checksum_error": {
+        "description": "Remote-daemon checksum error, please re-upgrade the firmware",
+        "severity": "medium"
+      },
+      "air_to_liquid_pcbsn_not_match": {
+        "description": "Air to liquid PCBSN does not match",
+        "severity": "medium"
+      },
+      "air_to_liquid_psusn_not_match": {
+        "description": "Air to liquid PSUSN does not match",
+        "severity": "medium"
+      },
+      "no_pool_info_configured": {
+        "description": "No pool information configured",
+        "severity": "medium"
+      },
+      "all_pools_disabled": {
+        "description": "All pools disabled, please check the network or change the pools configure.",
+        "severity": "medium"
+      },
+      "pool_connect_failed": {
+        "description": "Pool connection failed, user or password error.",
+        "severity": "medium"
+      },
+      "high_rejection_rate_pool": {
+        "description": "Pools rejection rate too high, please check the network or pools config.",
+        "severity": "medium"
+      },
+      "pool_not_support_asicboost": {
+        "description": "Pool lacks important feature",
+        "severity": "medium"
+      },
+      "switch_to_new_pool_failed": {
+        "description": "Failed to switch to a new pool",
+        "severity": "medium"
+      },
+      "hashboard_factory_test_failed": {
+        "description": "Factory test step not pass.",
+        "severity": "medium"
+      },
+      "hashrate_too_low": {
+        "description": "Hashrate too low, please reboot and check again",
+        "severity": "medium"
+      },
+      "high_loss_of_hash_rate": {
+        "description": "Hashrate loss, please reboot and check again",
+        "severity": "medium"
+      },
+      "chip_voltage_too_low": {
+        "description": "Chip voltage too low",
+        "severity": "medium"
+      },
+      "chip_voltage_change": {
+        "description": "Chip voltage change",
+        "severity": "medium"
+      },
+      "chip_temp_difference_large": {
+        "description": "Chip temperature difference is too large",
+        "severity": "medium"
+      },
+      "chip_hottest_temp_difference_large": {
+        "description": "Chip hottest temperature difference is too large",
+        "severity": "medium"
+      },
+      "water_velocity_abnormal": {
+        "description": "Liquid velocity is abnormal",
+        "severity": "medium"
+      },
+      "liquid_flow_rate_too_slow": {
+        "description": "The liquid flow rate is too slow",
+        "severity": "medium"
+      },
+      "frequency_up_timeout": {
+        "description": "Upfreq timeout",
+        "severity": "medium"
+      },
+      "version_low": {
+        "description": "WhatsMinerTool version is too low",
+        "severity": "medium"
+      },
+      "frequency_not_up_to_standard": {
+        "description": "Frequency is not up to standard",
+        "severity": "medium"
+      },
+      "hashrate_not_up_to_standard": {
+        "description": "Hash rate is not up to standard",
+        "severity": "medium"
+      },
+      "wrong_software_version": {
+        "description": "Wrong software version (older or not the official version)",
+        "severity": "medium"
+      },
+      "software_version_error": {
+        "description": "Software version error (model/generation mismatch)",
+        "severity": "medium"
+      },
+      "security_library_error": {
+        "description": "Security library error",
+        "severity": "medium"
+      },
+      "security_btminer_removed": {
+        "description": "Security btminer be removed",
+        "severity": "medium"
+      },
+      "security_illegal_file": {
+        "description": "Security illegal file",
+        "severity": "medium"
+      },
+      "security_virus_removed": {
+        "description": "Security virus is removed",
+        "severity": "medium"
+      },
+      "chip_error_nonce": {
+        "description": "Chip error nonce",
+        "severity": "medium"
+      },
+      "chip_few_nonce": {
+        "description": "Chip few nonce",
+        "severity": "medium"
+      },
+      "chip_temp_protected": {
+        "description": "Chip temp protected",
         "severity": "medium"
       }
     }

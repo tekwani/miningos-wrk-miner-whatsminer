@@ -92,6 +92,78 @@ const sendResponse = async (socket, data, encryptionKey, isEncrypted, delay) => 
 }
 
 /**
+ * Two-phase download_logs response: JSON header, then raw binary.
+ * CTX.dlFault injects wire-level failure modes for tests: coalesce,
+ * split-json, truncate, truncate-once, slow, stall, empty, malformed.
+ */
+const sendDownloadLogsResponse = async (socket, res, binaryData, encryptionKey, isEncrypted, CTX) => {
+  let fault = CTX.dlFault
+  if (fault === 'truncate-once') {
+    fault = CTX._dlFaultFired ? null : 'truncate'
+    CTX._dlFaultFired = true
+  }
+
+  if (CTX.delay) await promiseSleep(CTX.delay)
+
+  if (fault === 'empty') {
+    if (res.Msg && typeof res.Msg === 'object') res.Msg.logfilelen = '0'
+    if (res.msg && typeof res.msg === 'object') res.msg.logfilelen = '0'
+    socket.end(isEncrypted ? encryptResponse(res, encryptionKey) : JSON.stringify(res))
+    return
+  }
+
+  if (fault === 'malformed') {
+    socket.end('THIS-IS-NOT-JSON{{{')
+    return
+  }
+
+  const json = Buffer.from(isEncrypted ? encryptResponse(res, encryptionKey) : JSON.stringify(res))
+
+  if (fault === 'coalesce') {
+    socket.end(Buffer.concat([json, binaryData]))
+    return
+  }
+
+  if (fault === 'split-json') {
+    const mid = Math.floor(json.length / 2)
+    socket.write(json.subarray(0, mid))
+    await promiseSleep(5)
+    socket.write(json.subarray(mid))
+    await promiseSleep(10)
+    socket.end(binaryData)
+    return
+  }
+
+  socket.write(json)
+
+  if (fault === 'stall') {
+    return
+  }
+
+  await promiseSleep(10)
+
+  if (fault === 'truncate') {
+    socket.write(binaryData.subarray(0, Math.floor(binaryData.length / 2)))
+    await promiseSleep(5)
+    socket.destroy()
+    return
+  }
+
+  if (fault === 'slow') {
+    const chunk = Math.max(1, Math.ceil(binaryData.length / 4))
+    for (let i = 0; i < binaryData.length; i += chunk) {
+      socket.write(binaryData.subarray(i, i + chunk))
+      await promiseSleep(150)
+    }
+    socket.end()
+    return
+  }
+
+  // end() flushes the full payload; write() + destroy() truncates large payloads
+  socket.end(binaryData)
+}
+
+/**
  * Validates token for encrypted commands
  */
 const validateToken = (cmd, validTokens, hasPassword) => {
@@ -130,8 +202,8 @@ if (require.main === module) {
   agent.init(runServer)
 } else {
   module.exports = {
-    createServer ({ port, host, type, serial, password, apiVersion }) {
-      return runServer({ port, host, type, serial, password, apiVersion })
+    createServer ({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes }) {
+      return runServer({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes })
     }
   }
 }
@@ -150,7 +222,9 @@ function runServer (argv, ops = {}) {
     minerpoolMockPort: argv.minerpoolMockPort,
     minerpoolMockHost: argv.minerpoolMockHost,
     password: argv.password || defaultPassword,
-    apiVersion
+    apiVersion,
+    dlFault: argv.dlFault || null,
+    dlLogSizeBytes: argv.dlLogSizeBytes || null
   }
 
   const STATE = {}
@@ -243,24 +317,11 @@ function runServer (argv, ops = {}) {
         return
       }
 
-      // Handle two-phase responses (e.g., download_logs)
-      // The command handler attaches _binaryPayload for data that should be
-      // sent as raw bytes after the JSON response (matching real hardware behavior)
+      // Two-phase response: command handler attached raw bytes to send after the JSON
       if (res._binaryPayload) {
         const binaryData = res._binaryPayload
         delete res._binaryPayload
-
-        if (CTX.delay) await promiseSleep(CTX.delay)
-
-        if (isEncrypted) {
-          socket.write(encryptResponse(res, encryptionKey))
-        } else {
-          socket.write(JSON.stringify(res))
-        }
-
-        await promiseSleep(10)
-        socket.write(binaryData)
-        socket.destroy()
+        await sendDownloadLogsResponse(socket, res, binaryData, encryptionKey, isEncrypted, CTX)
         return
       }
 
@@ -338,6 +399,10 @@ function runServer (argv, ops = {}) {
     },
     reset: () => {
       return STATE.cleanup()
+    },
+    setDlFault: (fault) => {
+      CTX.dlFault = fault
+      CTX._dlFaultFired = false
     }
   }
 }

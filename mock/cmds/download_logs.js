@@ -8,7 +8,7 @@ const { createSuccessResponse } = require('../utils')
  * Returns a _binaryPayload that the mock server sends after the JSON response
  */
 module.exports = function (ctx, state) {
-  const mockLogContent = Buffer.from(
+  let mockLogContent = Buffer.from(
     '=== Whatsminer Log Export ===\n' +
     `Serial: ${ctx.serial}\n` +
     `Type: ${ctx.type}\n` +
@@ -19,6 +19,14 @@ module.exports = function (ctx, state) {
     '[INFO] Hashrate stable at target frequency\n' +
     '--- End of Log ---\n'
   )
+
+  // ctx.dlLogSizeBytes lets tests exercise multi-chunk binary transfers
+  if (ctx.dlLogSizeBytes && ctx.dlLogSizeBytes > mockLogContent.length) {
+    mockLogContent = Buffer.concat([
+      Buffer.alloc(ctx.dlLogSizeBytes - mockLogContent.length, 0x41),
+      mockLogContent
+    ])
+  }
 
   const response = createSuccessResponse({
     logfilelen: mockLogContent.length.toString()

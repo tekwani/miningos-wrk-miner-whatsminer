@@ -26,7 +26,8 @@ const miner = new Miner({
   port: conf.settings.port,
   password: conf.settings.password,
   id: '001',
-  apiVersion: '2.0.5' // Explicitly set to V2 for testing
+  apiVersion: '2.0.5', // Explicitly set to V2 for testing
+  findFirmware: async () => '/dev/null'
 })
 
 conf.cleanup = async () => {

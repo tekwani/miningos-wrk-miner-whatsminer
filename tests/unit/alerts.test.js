@@ -276,3 +276,107 @@ test('alerts - probe functions handle multiple temperature readings', (t) => {
   }
   t.ok(chipTempWarning.probe(ctx, multiChipSnap), 'should trigger when any chip temp is above threshold')
 })
+
+const MIN_10_MS = 10 * 60 * 1000
+const MIN_30_MS = 30 * 60 * 1000
+
+const withMiningMocks = (fn) => {
+  const tplUtils = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/utils')
+  const original = { isValidSnap: tplUtils.isValidSnap, isOffline: tplUtils.isOffline }
+  tplUtils.isValidSnap = (snap) => Boolean(snap?.stats)
+  tplUtils.isOffline = (snap) => snap?.stats?.status === 'offline'
+  try {
+    fn()
+  } finally {
+    tplUtils.isValidSnap = original.isValidSnap
+    tplUtils.isOffline = original.isOffline
+  }
+}
+
+test('alerts - low_power_warning valid and probe', (t) => {
+  const spec = alerts.specs.miner.low_power_warning
+  t.ok(spec, 'should exist')
+  t.ok(typeof spec.valid === 'function', 'should have valid function')
+  t.ok(typeof spec.probe === 'function', 'should have probe function')
+
+  withMiningMocks(() => {
+    const ctx = { conf: { low_power_warning: { lowPower: 80 } } }
+    // nominal 20 W/THs * 100 THs (100,000,000 MHS) target => 2000 W target, threshold 1600 W
+    const base = {
+      stats: {
+        status: 'mining',
+        uptime_ms: MIN_10_MS + 1,
+        nominal_efficiency_w_ths: 20,
+        hashrate_mhs: { target: 100_000_000, avg: 100_000_000 },
+        power_w: 1500
+      }
+    }
+    t.ok(spec.valid(ctx, base), 'valid when mining > 10 min with a derivable target power')
+    t.ok(spec.probe(ctx, base), 'triggers when power below 80% of target')
+
+    const okPower = { stats: { ...base.stats, power_w: 1800 } }
+    t.not(spec.probe(ctx, okPower), 'does not trigger when power above threshold')
+
+    const tooEarly = { stats: { ...base.stats, uptime_ms: MIN_10_MS - 1 } }
+    t.not(spec.valid(ctx, tooEarly), 'not valid before 10 min of mining')
+
+    const noTarget = { stats: { ...base.stats, nominal_efficiency_w_ths: 0 } }
+    t.not(spec.valid(ctx, noTarget), 'not valid without a derivable target power')
+
+    const offline = { stats: { ...base.stats, status: 'offline' } }
+    t.not(spec.valid(ctx, offline), 'not valid when offline')
+  })
+})
+
+test('alerts - low_hashrate_warning valid and probe', (t) => {
+  const spec = alerts.specs.miner.low_hashrate_warning
+  t.ok(spec, 'should exist')
+
+  withMiningMocks(() => {
+    const ctx = { conf: { low_hashrate_warning: { lowHash: 80 } } }
+    const base = {
+      stats: {
+        status: 'mining',
+        uptime_ms: MIN_30_MS + 1,
+        hashrate_mhs: { target: 100_000_000, avg: 70_000_000 }
+      }
+    }
+    t.ok(spec.valid(ctx, base), 'valid when mining > 30 min with a target hashrate')
+    t.ok(spec.probe(ctx, base), 'triggers when hashrate below 80% of target')
+
+    const okHash = { stats: { ...base.stats, hashrate_mhs: { target: 100_000_000, avg: 90_000_000 } } }
+    t.not(spec.probe(ctx, okHash), 'does not trigger when hashrate above threshold')
+
+    const tooEarly = { stats: { ...base.stats, uptime_ms: MIN_30_MS - 1 } }
+    t.not(spec.valid(ctx, tooEarly), 'not valid before 30 min of mining')
+
+    const noTarget = { stats: { ...base.stats, hashrate_mhs: { target: 0, avg: 70_000_000 } } }
+    t.not(spec.valid(ctx, noTarget), 'not valid without a target hashrate')
+  })
+})
+
+test('alerts - high_efficiency_warning valid and probe', (t) => {
+  const spec = alerts.specs.miner.high_efficiency_warning
+  t.ok(spec, 'should exist')
+
+  withMiningMocks(() => {
+    const ctx = { conf: { high_efficiency_warning: { highEfficiency: 125 } } }
+    // nominal 20 W/THs => threshold 25 W/THs
+    const base = {
+      stats: {
+        status: 'mining',
+        uptime_ms: MIN_30_MS + 1,
+        nominal_efficiency_w_ths: 20,
+        efficiency_w_ths: 30
+      }
+    }
+    t.ok(spec.valid(ctx, base), 'valid when mining > 30 min with a nominal efficiency')
+    t.ok(spec.probe(ctx, base), 'triggers when efficiency above 125% of nominal')
+
+    const okEff = { stats: { ...base.stats, efficiency_w_ths: 22 } }
+    t.not(spec.probe(ctx, okEff), 'does not trigger when efficiency within range')
+
+    const noNominal = { stats: { ...base.stats, nominal_efficiency_w_ths: 0 } }
+    t.not(spec.valid(ctx, noNominal), 'not valid without a nominal efficiency')
+  })
+})
