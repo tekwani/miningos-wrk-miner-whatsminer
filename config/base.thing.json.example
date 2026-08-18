@@ -5,6 +5,10 @@
   "logKeepCount": 3,
   "thingRtdConcurrency": 500,
   "thresholdHashrate": 50000000,
+  "containerSubnets": {
+    "group-1": "10.182.0.0/24",
+    "group-2": "10.10.0.0/24"
+  },
   "alerts": {
     "miner-wm-m56s": {
       "pcb_temp_warning": {

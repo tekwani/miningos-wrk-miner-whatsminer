@@ -172,6 +172,8 @@ Check out [miningos-tpl-wrk-miner](https://github.com/tetherto/miningos-tpl-wrk-
 - M30SP/M30SPP: 33 W/TH/s (default)
 - M53S/M56S/M63: 26 W/TH/s (default)
 
+**`containerSubnets`** (optional): maps `info.container` values to subnet CIDRs (e.g. `"group-1": "10.182.0.0/24"`). When set, the miner template resolves a miner's `info.subnet` from its container on register/update, so moving a miner to another container reassigns its IP in the mapped subnet. Containers missing from the mapping keep their existing subnet.
+
 ### Alert Configuration
 
 Each model has specific alert configurations for various conditions:
