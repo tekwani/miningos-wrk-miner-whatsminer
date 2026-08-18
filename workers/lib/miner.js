@@ -15,7 +15,7 @@ const {
   MINER_COOLING_TYPE_MAP,
   DOWNLOAD_LOGS
 } = require('./constants')
-const { RESPONSE_CODES_V2 } = require('./protocols/constants')
+const { RESPONSE_CODES_V2, V3_DEFAULT_ACCOUNT } = require('./protocols/constants')
 const { STATUS, POWER_MODE } = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/constants')
 const { ApiHandlerFactory, API_VERSIONS } = require('./protocols')
 
@@ -83,6 +83,7 @@ class WhatsminerMiner extends BaseMiner {
     this.protocolHandler = ApiHandlerFactory.create(this.apiVersion, {
       rpc: this.rpc,
       password: this.opts.password,
+      username: this.opts.username,
       debugError: this.debugError.bind(this)
     })
   }
@@ -306,7 +307,7 @@ class WhatsminerMiner extends BaseMiner {
     if (this.apiVersion === API_VERSIONS.V3) {
       const { token, key } = this.protocolHandler.generateTokenInfo(downloadCmd)
       const ts = Math.floor(Date.now() / 1000)
-      const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: 'super' })
+      const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: this.opts.username || V3_DEFAULT_ACCOUNT })
       const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
       return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
     }

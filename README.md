@@ -174,6 +174,10 @@ Check out [miningos-tpl-wrk-miner](https://github.com/tetherto/miningos-tpl-wrk-
 
 **`containerSubnets`** (optional): maps `info.container` values to subnet CIDRs (e.g. `"group-1": "10.182.0.0/24"`). When set, the miner template resolves a miner's `info.subnet` from its container on register/update, so moving a miner to another container reassigns its IP in the mapped subnet. Containers missing from the mapping keep their existing subnet.
 
+**`miner.defaultUsername` / `miner.defaultPassword`** (optional): fallback credentials used to connect to a miner when `opts.username` / `opts.password` are not set on the thing. Lets miners be registered without per-miner credentials; per-miner `opts` values always take precedence.
+
+> Note: if a miner's admin password is later changed on the device (e.g. via `updateAdminPassword`) and the thing was relying on `defaultPassword`, set that miner's `opts.password` explicitly — otherwise the next reconnect falls back to the now-stale `defaultPassword`.
+
 ### Alert Configuration
 
 Each model has specific alert configurations for various conditions:

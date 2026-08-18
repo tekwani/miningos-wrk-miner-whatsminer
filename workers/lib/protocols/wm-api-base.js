@@ -12,6 +12,7 @@ class WMApiBase {
     this.opts = opts
     this.rpc = opts.rpc
     this.password = opts.password
+    this.username = opts.username
     this.debugError = opts.debugError || (() => {})
   }
 

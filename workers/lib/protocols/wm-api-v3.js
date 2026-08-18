@@ -3,7 +3,7 @@
 const CryptoJS = require('crypto-js')
 const WMApiBase = require('./wm-api-base')
 const hex2a = require('../utils/hex2a')
-const { API_VERSIONS, API_DEFAULTS, COMMAND_MAP_V3, V3_STATUS_PARAMS, RESPONSE_CODES_V3 } = require('./constants')
+const { API_VERSIONS, API_DEFAULTS, COMMAND_MAP_V3, V3_STATUS_PARAMS, RESPONSE_CODES_V3, V3_DEFAULT_ACCOUNT } = require('./constants')
 
 /**
  * Protocol handler for Whatsminer API v3.0.3
@@ -127,7 +127,7 @@ class WMApiV3 extends WMApiBase {
           cmd: command,
           ts,
           token,
-          account: 'super',
+          account: this.username || V3_DEFAULT_ACCOUNT,
           ...params
         }
 

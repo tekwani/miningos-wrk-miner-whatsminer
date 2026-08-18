@@ -1963,6 +1963,8 @@
   },
   "miner": {
     "timeout": 30000,
+    "defaultUsername": "MINER_USERNAME",
+    "defaultPassword": "MINER_PASSWORD",
     "pools": [
       {
         "url": "POOL_URL",
