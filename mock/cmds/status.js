@@ -16,6 +16,6 @@ module.exports = function (ctx, state) {
     hash_percent: '0',
     fast_mining: 'false',
     fast_hash: 'false',
-    liquid_temp: 0
+    liquid_temp: (Math.random() * 60 + 20).toFixed(2)
   })
 }
