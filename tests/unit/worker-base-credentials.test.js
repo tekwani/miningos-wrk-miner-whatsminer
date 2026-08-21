@@ -40,6 +40,26 @@ test('_getThingCredentials handles missing miner conf section', (t) => {
   t.alike(ctx._getThingCredentials(thg), { username: undefined, password: 'p' })
 })
 
+test('_getThingCredentials uses defaults over opts when overwriteCredsWithDefault is true', (t) => {
+  const ctx = makeCtx({
+    defaultUsername: 'confuser',
+    defaultPassword: 'confpass',
+    overwriteCredsWithDefault: true
+  })
+  const thg = { opts: { username: 'optsuser', password: 'optspass' } }
+  t.alike(ctx._getThingCredentials(thg), { username: 'confuser', password: 'confpass' })
+})
+
+test('_getThingCredentials keeps opts precedence when overwriteCredsWithDefault is false', (t) => {
+  const ctx = makeCtx({
+    defaultUsername: 'confuser',
+    defaultPassword: 'confpass',
+    overwriteCredsWithDefault: false
+  })
+  const thg = { opts: { username: 'optsuser', password: 'optspass' } }
+  t.alike(ctx._getThingCredentials(thg), { username: 'optsuser', password: 'optspass' })
+})
+
 // connectThing guard: a thing may connect on defaultPassword alone, but must be
 // blocked when no password can be resolved at all.
 
@@ -73,4 +93,13 @@ test('connectThing connects using defaultPassword when the thing has no opts.pas
   t.ok(thg.ctrl, 'controller created')
   t.is(thg.ctrl.opts.password, 'confpass', 'controller built with the default password')
   t.is(thg.ctrl.opts.username, 'confuser', 'controller built with the default username')
+})
+
+test('connectThing connects with the defaults when overwriteCredsWithDefault is true', async (t) => {
+  const ctx = makeConnectCtx({ defaultUsername: 'confuser', defaultPassword: 'confpass', overwriteCredsWithDefault: true })
+  const thg = { id: 't1', type: 'miner', opts: { address: '10.0.0.1', port: 4028, apiVersion: '2.0.5', username: 'optsuser', password: 'optspass' }, info: {} }
+  const res = await ctx.connectThing(thg)
+  t.is(res, 1, 'connected')
+  t.is(thg.ctrl.opts.username, 'confuser', 'controller built with the default username')
+  t.is(thg.ctrl.opts.password, 'confpass', 'controller built with the default password')
 })
