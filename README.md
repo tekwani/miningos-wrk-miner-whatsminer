@@ -178,6 +178,10 @@ Check out [miningos-tpl-wrk-miner](https://github.com/tetherto/miningos-tpl-wrk-
 
 > Note: if a miner's admin password is later changed on the device (e.g. via `updateAdminPassword`) and the thing was relying on `defaultPassword`, set that miner's `opts.password` explicitly — otherwise the next reconnect falls back to the now-stale `defaultPassword`.
 
+**`miner.overwriteCredsWithDefault`** (optional, boolean): when `true`, `miner.defaultUsername` / `miner.defaultPassword` are used for every miner connection, overriding per-miner `opts.username` / `opts.password`. Nothing is written to the device or to the stored thing opts — set it back to `false` and per-miner credentials apply again.
+
+Precedence when connecting: `overwriteCredsWithDefault: true` (defaults for everyone) > per-miner `opts` > `defaultUsername` / `defaultPassword` as fallback.
+
 ### Alert Configuration
 
 Each model has specific alert configurations for various conditions:

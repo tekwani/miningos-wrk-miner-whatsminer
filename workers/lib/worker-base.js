@@ -107,14 +107,6 @@ class WrkMinerRack extends WrkRack {
     }
   }
 
-  _getThingCredentials (thg) {
-    const minerConf = this.conf.thing.miner || {}
-    return {
-      username: thg.opts.username || minerConf.defaultUsername,
-      password: thg.opts.password || minerConf.defaultPassword
-    }
-  }
-
   async connectThing (thg) {
     const { username, password } = this._getThingCredentials(thg)
     if (!thg.opts.address || !thg.opts.port || !password) {
