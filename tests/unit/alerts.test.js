@@ -380,3 +380,83 @@ test('alerts - high_efficiency_warning valid and probe', (t) => {
     t.not(spec.valid(ctx, noNominal), 'not valid without a nominal efficiency')
   })
 })
+
+for (const key of ['custom.high_board_temp.warning', 'custom.high_board_temp.critical']) {
+  test(`${key} alert - exists with valid and probe functions`, (t) => {
+    const spec = alerts.specs.miner[key]
+    t.ok(spec, 'should exist')
+    t.ok(typeof spec.valid === 'function', 'should have valid function')
+    t.ok(typeof spec.probe === 'function', 'should have probe function')
+  })
+
+  test(`${key} alert - valid is false when not enabled`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: false, maxTempC: 80 } } }
+      const snap = { stats: { temperature_c: { pcb: [{ current: 90 }] } } }
+      t.not(spec.valid(ctx, snap), 'should not be valid when disabled')
+    })
+  })
+
+  test(`${key} alert - valid is false when configuredParams is missing entirely`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: {} }
+      const snap = { stats: { temperature_c: { pcb: [{ current: 90 }] } } }
+      t.not(spec.valid(ctx, snap), 'should not be valid when configuredParams is missing')
+    })
+  })
+
+  test(`${key} alert - valid is true when enabled and snap is valid`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+      const snap = { stats: { temperature_c: { pcb: [{ current: 90 }] } } }
+      t.ok(spec.valid(ctx, snap), 'should be valid when enabled and snap is valid')
+    })
+  })
+
+  test(`${key} alert - valid is false for an invalid snap`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+      t.not(spec.valid(ctx, null), 'should not be valid for null snap')
+      t.not(spec.valid(ctx, {}), 'should not be valid for snap without stats')
+    })
+  })
+
+  test(`${key} alert - probe does not trigger when temp is below threshold`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+    const snap = { stats: { temperature_c: { pcb: [{ current: 70 }] } } }
+    t.absent(spec.probe(ctx, snap), 'should not trigger when temp is below threshold')
+  })
+
+  test(`${key} alert - probe does not trigger when temp equals threshold`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+    const snap = { stats: { temperature_c: { pcb: [{ current: 80 }] } } }
+    t.absent(spec.probe(ctx, snap), 'should not trigger when temp equals threshold')
+  })
+
+  test(`${key} alert - probe triggers when temp is above threshold`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+    const snap = { stats: { temperature_c: { pcb: [{ current: 90 }] } } }
+    t.ok(spec.probe(ctx, snap), 'should trigger when temp is above threshold')
+  })
+
+  test(`${key} alert - probe triggers when any pcb reading is above threshold`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+    const snap = { stats: { temperature_c: { pcb: [{ current: 60 }, { current: 90 }] } } }
+    t.ok(spec.probe(ctx, snap), 'should trigger when any pcb reading exceeds threshold')
+  })
+
+  test(`${key} alert - probe does not trigger with no pcb temperature data`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: { enabled: true, maxTempC: 80 } } }
+    const snap = { stats: {} }
+    t.absent(spec.probe(ctx, snap), 'should not trigger when no pcb temperature data')
+  })
+}

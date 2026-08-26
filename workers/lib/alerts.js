@@ -76,6 +76,32 @@ libAlerts.specs.miner = {
       const threshold = snap.stats.nominal_efficiency_w_ths * (ctx.conf.high_efficiency_warning.highEfficiency / 100)
       return snap.stats.efficiency_w_ths > threshold
     }
+  },
+  'custom.high_board_temp.warning': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_board_temp.warning']
+      const enabled = configuredParams?.enabled
+
+      return enabled && libUtils.isValidSnap(snap)
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_board_temp.warning']
+      const threshold = configuredParams.maxTempC
+      return snap.stats.temperature_c?.pcb?.some((t) => t.current > threshold)
+    }
+  },
+  'custom.high_board_temp.critical': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_board_temp.critical']
+      const enabled = configuredParams?.enabled
+
+      return enabled && libUtils.isValidSnap(snap)
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_board_temp.critical']
+      const threshold = configuredParams.maxTempC
+      return snap.stats.temperature_c?.pcb?.some((t) => t.current > threshold)
+    }
   }
 }
 

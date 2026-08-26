@@ -1958,6 +1958,22 @@
       "chip_temp_protected": {
         "description": "Chip temp protected",
         "severity": "medium"
+      },
+      "custom.low_hashrate.warning": {
+        "description": "Miner hashrate too low",
+        "severity": "warning"
+      },
+      "custom.low_hashrate.critical": {
+        "description": "Miner hashrate too low",
+        "severity": "critical"
+      },
+      "custom.high_board_temp.warning": {
+        "description": "PCB temperature too high",
+        "severity": "warning"
+      },
+      "custom.high_board_temp.critical": {
+        "description": "PCB temperature too high",
+        "severity": "critical"
       }
     }
   },
