@@ -1124,8 +1124,11 @@ class WhatsminerMiner extends BaseMiner {
   }
 
   checkIfAllErrorsAreMinor (errors) {
-    const minerType = this.opts.type
-    if (minerType.includes('m56s') || minerType.includes('m30')) {
+    const minerType = this.opts.type || ''
+    // m63/m63spp share the standard WhatsMiner error table with the m56s/m30 line.
+    // Leaving them out made every m63 error major, so a miner hashing with a minor
+    // error (e.g. 714 network_connection_unstable) was reported as broken.
+    if (minerType.includes('m56s') || minerType.includes('m30') || minerType.includes('m63')) {
       return errors.every(error => MINOR_ERROR_CODES_M56S_M30_SET.has(error))
     } else if (minerType.includes('m53')) {
       return errors.every(error => MINOR_ERROR_CODES_M53_SET.has(error))

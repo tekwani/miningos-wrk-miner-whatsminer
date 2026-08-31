@@ -24,46 +24,6 @@ test('stats - groupByMinerInfo function', (t) => {
   t.ok(typeof hashrateGroup.group === 'function', 'should have group function')
 })
 
-test('stats - checkIfAllErrorsAreMinor function', (t) => {
-  // Test the function indirectly through the filter operations
-  const m56sSpecs = stats.specs['miner-wm-m56s']
-  const onlineOrMinorErrorFilter = m56sSpecs.ops.online_or_minor_error_miners_cnt.filter
-
-  // Test that the filter functions exist and are callable
-  t.ok(typeof onlineOrMinorErrorFilter === 'function', 'should have filter function')
-
-  // Test with different status values
-  const testEntry = {
-    last: {
-      snap: {
-        stats: { status: 'mining' }
-      }
-    }
-  }
-
-  t.ok(onlineOrMinorErrorFilter(testEntry), 'should return true for mining status')
-})
-
-test('stats - getSharedOps function', (t) => {
-  // Test the shared operations for different miner types
-  const m56sSpecs = stats.specs['miner-wm-m56s']
-  const m53sSpecs = stats.specs['miner-wm-m53s']
-
-  // Both should have the same shared operations
-  const expectedOps = ['online_or_minor_error_miners_cnt', 'error_miners_cnt']
-
-  for (const opName of expectedOps) {
-    t.ok(m56sSpecs.ops[opName], `m56s should have ${opName} operation`)
-    t.ok(m53sSpecs.ops[opName], `m53s should have ${opName} operation`)
-
-    t.is(m56sSpecs.ops[opName].op, 'cnt', `${opName} should be a count operation`)
-    t.is(m53sSpecs.ops[opName].op, 'cnt', `${opName} should be a count operation`)
-
-    t.ok(typeof m56sSpecs.ops[opName].filter === 'function', `${opName} should have filter function`)
-    t.ok(typeof m53sSpecs.ops[opName].filter === 'function', `${opName} should have filter function`)
-  }
-})
-
 test('stats - sharedPoolStats', (t) => {
   const minerSpecs = stats.specs.miner
   const poolStats = minerSpecs.ops
@@ -113,85 +73,180 @@ test('stats - m63 specific operations', (t) => {
   t.is(ops.status_group.src, 'last.snap.stats.status')
 })
 
-test('stats - error_miners_cnt filter', (t) => {
-  const m56sSpecs = stats.specs['miner-wm-m56s']
-  const errorFilter = m56sSpecs.ops.error_miners_cnt.filter
+test('stats - miner spec carries the status count ops', (t) => {
+  const ops = stats.specs.miner.ops
 
-  // Test that the filter function exists
-  t.ok(typeof errorFilter === 'function', 'should have filter function')
-
-  // Test with mining status (should return false)
-  const miningEntry = {
-    last: {
-      snap: {
-        stats: { status: 'mining' }
-      }
-    }
-  }
-
-  t.not(errorFilter(miningEntry), 'should return false for mining status')
-})
-
-test('stats - online_or_minor_error_miners_cnt filter', (t) => {
-  const m56sSpecs = stats.specs['miner-wm-m56s']
-  const onlineFilter = m56sSpecs.ops.online_or_minor_error_miners_cnt.filter
-
-  // Test that the filter function exists
-  t.ok(typeof onlineFilter === 'function', 'should have filter function')
-
-  // Test with mining status
-  const miningEntry = {
-    last: {
-      snap: {
-        stats: { status: 'mining' }
-      }
-    }
-  }
-
-  t.ok(onlineFilter(miningEntry), 'should return true for mining status')
-})
-
-test('stats - miner type specific specs', (t) => {
-  const expectedMinerTypes = [
-    'miner-wm-m30s',
-    'miner-wm-m56s',
-    'miner-wm-m53s',
-    'miner-wm-m63'
-  ]
-
-  for (const minerType of expectedMinerTypes) {
-    t.ok(stats.specs[minerType], `should have specs for ${minerType}`)
-    t.ok(stats.specs[minerType].ops, `${minerType} should have ops`)
+  for (const opName of ['online_or_minor_error_miners_cnt', 'error_miners_cnt']) {
+    t.ok(ops[opName], `miner spec should have ${opName}`)
+    t.is(ops[opName].op, 'cnt', `${opName} should be a count operation`)
+    t.ok(typeof ops[opName].filter === 'function', `${opName} should have a filter`)
   }
 })
 
-test('stats - minor error codes sets', (t) => {
-  // Test that the minor error codes are properly defined
-  const m56sSpecs = stats.specs['miner-wm-m56s']
-  const m53sSpecs = stats.specs['miner-wm-m53s']
+test('stats - status count ops live only on the miner spec', (t) => {
+  // Every whatsminer worker reports the `miner` spec tag, and m63 additionally reports
+  // `miner-wm-m63`. Defining the same cnt op on both would count m63 miners twice.
+  for (const [specName, spec] of Object.entries(stats.specs)) {
+    if (specName === 'miner') continue
+    t.absent(
+      spec.ops.online_or_minor_error_miners_cnt,
+      `${specName} should not redefine online_or_minor_error_miners_cnt`
+    )
+    t.absent(
+      spec.ops.error_miners_cnt,
+      `${specName} should not redefine error_miners_cnt`
+    )
+  }
+})
 
-  // These should use different minor error code sets
-  // We can test this by checking that the filter functions behave differently
-  // for the same error codes
-
-  const testEntry = {
+function minerEntry (status, opts = {}) {
+  return {
+    info: { container: opts.container ?? 'group-4' },
     last: {
       snap: {
-        stats: { status: 'ERROR' },
-        errors: [{ code: 202 }] // This should be minor for M53 but not for M56S
+        stats: {
+          status,
+          ...(opts.areAllErrorsMinor === undefined
+            ? {}
+            : { are_all_errors_minor: opts.areAllErrorsMinor })
+        }
       }
     }
   }
+}
 
-  const m56sOnlineFilter = m56sSpecs.ops.online_or_minor_error_miners_cnt.filter
-  const m53sOnlineFilter = m53sSpecs.ops.online_or_minor_error_miners_cnt.filter
+test('stats - online count includes miners hashing through minor errors', (t) => {
+  const onlineFilter = stats.specs.miner.ops.online_or_minor_error_miners_cnt.filter
 
-  // Error code 202 should be treated differently by the two filters
-  // (This tests that they use different minor error code sets)
-  const m56sResult = m56sOnlineFilter(testEntry)
-  const m53sResult = m53sOnlineFilter(testEntry)
+  t.ok(onlineFilter(minerEntry('mining')), 'mining miner counts as online')
+  t.ok(
+    onlineFilter(minerEntry('error', { areAllErrorsMinor: true })),
+    'miner in error with only minor errors counts as online'
+  )
+  t.absent(
+    onlineFilter(minerEntry('error', { areAllErrorsMinor: false })),
+    'miner with a major error does not count as online'
+  )
+  t.absent(onlineFilter(minerEntry('error')), 'missing flag is treated as a major error')
+  t.absent(onlineFilter(minerEntry('offline')), 'offline miner does not count as online')
+})
 
-  // At least one should be different (they use different minor error sets)
-  t.ok(typeof m56sResult === 'boolean', 'm56s filter should return boolean')
-  t.ok(typeof m53sResult === 'boolean', 'm53s filter should return boolean')
+test('stats - error count excludes miners hashing through minor errors', (t) => {
+  const errorFilter = stats.specs.miner.ops.error_miners_cnt.filter
+
+  t.ok(
+    errorFilter(minerEntry('error', { areAllErrorsMinor: false })),
+    'miner with a major error counts as errored'
+  )
+  t.absent(
+    errorFilter(minerEntry('error', { areAllErrorsMinor: true })),
+    'miner in error with only minor errors is not counted as errored'
+  )
+  t.absent(errorFilter(minerEntry('mining')), 'mining miner is not counted as errored')
+})
+
+test('stats - every errored miner lands in exactly one bucket', (t) => {
+  // The site header sums online + error + offline; a miner falling through every
+  // filter silently disappears from the dashboard total.
+  const onlineFilter = stats.specs.miner.ops.online_or_minor_error_miners_cnt.filter
+  const errorFilter = stats.specs.miner.ops.error_miners_cnt.filter
+
+  for (const areAllErrorsMinor of [true, false]) {
+    const entry = minerEntry('error', { areAllErrorsMinor })
+    const buckets = [onlineFilter(entry), errorFilter(entry)].filter(Boolean)
+    t.is(buckets.length, 1, `are_all_errors_minor=${areAllErrorsMinor} lands in one bucket`)
+  }
+})
+
+test('stats - miners under maintenance are excluded from the counts', (t) => {
+  const onlineFilter = stats.specs.miner.ops.online_or_minor_error_miners_cnt.filter
+  const errorFilter = stats.specs.miner.ops.error_miners_cnt.filter
+
+  t.absent(
+    onlineFilter(minerEntry('mining', { container: 'maintenance' })),
+    'maintenance miner is not counted as online'
+  )
+  t.absent(
+    errorFilter(minerEntry('error', { container: 'maintenance', areAllErrorsMinor: false })),
+    'maintenance miner is not counted as errored'
+  )
+})
+
+function modeEntry (status, mode, opts = {}) {
+  return {
+    info: { container: opts.container ?? 'group-4' },
+    last: {
+      snap: {
+        config: { power_mode: mode },
+        stats: {
+          status,
+          ...(opts.areAllErrorsMinor === undefined
+            ? {}
+            : { are_all_errors_minor: opts.areAllErrorsMinor })
+        }
+      }
+    }
+  }
+}
+
+const GROUPED_OPS = [
+  ['per-container', 'error_cnt', 'power_mode_low_cnt', 'power_mode_normal_cnt', 'power_mode_high_cnt'],
+  ['per-type', 'error_type_cnt', 'power_mode_low_type_cnt', 'power_mode_normal_type_cnt', 'power_mode_high_type_cnt']
+]
+
+test('stats - grouped status ops are present for container and type', (t) => {
+  const ops = stats.specs.miner.ops
+
+  for (const [label, ...opNames] of GROUPED_OPS) {
+    for (const opName of opNames) {
+      t.ok(ops[opName], `${label} spec should have ${opName}`)
+      t.is(ops[opName].op, 'group_cnt', `${opName} should be a grouped count`)
+      t.ok(typeof ops[opName].group === 'function', `${opName} should have a group function`)
+      t.ok(typeof ops[opName].filter === 'function', `${opName} should have a filter`)
+    }
+  }
+})
+
+test('stats - grouped ops key off the right grouping field', (t) => {
+  const ops = stats.specs.miner.ops
+  const ext = { info: { container: 'group-4' }, type: 'miner-wm-m63spp' }
+
+  t.is(ops.error_cnt.group(null, ext), 'group-4', 'container ops group by info.container')
+  t.is(ops.error_type_cnt.group(null, ext), 'miner-wm-m63spp', 'type ops group by type')
+})
+
+test('stats - grouped counts put minor-error miners in their power mode bucket', (t) => {
+  const ops = stats.specs.miner.ops
+
+  for (const [label, errorOp, , normalOp] of GROUPED_OPS) {
+    const minorError = modeEntry('error', 'normal', { areAllErrorsMinor: true })
+
+    t.absent(ops[errorOp].filter(minorError), `${label}: minor error is not an error`)
+    t.ok(ops[normalOp].filter(minorError), `${label}: minor error counts in its power mode`)
+
+    const majorError = modeEntry('error', 'normal', { areAllErrorsMinor: false })
+    t.ok(ops[errorOp].filter(majorError), `${label}: major error stays an error`)
+    t.absent(ops[normalOp].filter(majorError), `${label}: major error is not in a power mode`)
+
+    const mining = modeEntry('mining', 'normal')
+    t.ok(ops[normalOp].filter(mining), `${label}: plain mining still counts`)
+    t.absent(ops[errorOp].filter(mining), `${label}: plain mining is not an error`)
+  }
+})
+
+test('stats - grouped counts respect the miner power mode', (t) => {
+  const ops = stats.specs.miner.ops
+  const lowMinorError = modeEntry('error', 'low', { areAllErrorsMinor: true })
+
+  t.ok(ops.power_mode_low_cnt.filter(lowMinorError), 'low-mode miner lands in the low bucket')
+  t.absent(ops.power_mode_normal_cnt.filter(lowMinorError), 'and not in the normal bucket')
+  t.absent(ops.power_mode_high_cnt.filter(lowMinorError), 'and not in the high bucket')
+})
+
+test('stats - grouped error counts keep excluding maintenance containers', (t) => {
+  const ops = stats.specs.miner.ops
+  const entry = modeEntry('error', 'normal', { container: 'maintenance', areAllErrorsMinor: false })
+
+  t.absent(ops.error_cnt.filter(entry), 'maintenance miner is not counted per container')
+  t.absent(ops.error_type_cnt.filter(entry), 'maintenance miner is not counted per type')
 })

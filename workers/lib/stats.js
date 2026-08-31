@@ -1,47 +1,94 @@
 'use strict'
 
 const libStats = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/stats')
-const { STATUS } = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/constants')
-const { getVal } = require('@tetherto/miningos-lib-stats/utils')
-
-const MINOR_ERROR_CODES_M56S_M30_SET = new Set(
-  [203, 204, 205, 206, 219, 236, 248, 270, 275, 320, 321, 322, 620, 714, 901, 2320, 2330, 2350, 5140, 5141]
-)
-
-const MINOR_ERROR_CODES_M53_SET = new Set(
-  [202, 205, 264, 265, 266, 267, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280]
-)
+const {
+  STATUS,
+  POWER_MODE,
+  MAINTENANCE
+} = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/constants')
+const { getVal, groupBy } = require('@tetherto/miningos-lib-stats/utils')
 
 function groupByMinerInfo (entry, ext) {
   return `${getVal(ext, 'info.container')}-${getVal(ext, 'info.pos')}`
 }
 
-function checkIfAllErrorsAreMinor (entry, minorErrorCodesSet) {
-  return entry?.last?.snap?.stats?.status === STATUS.ERROR &&
-    entry?.last?.snap?.errors?.every(error => minorErrorCodesSet.has(error.code))
+function isCounted (entry) {
+  return entry?.info?.container !== MAINTENANCE
 }
 
-function getSharedOps (minorErrorCodesSet) {
-  return {
-    online_or_minor_error_miners_cnt: {
-      op: 'cnt',
+// The miner worker already resolves the model-specific minor error table when it
+// builds the snapshot, so the stats layer just reads the flag it left behind.
+function isMiningWithMinorErrors (entry) {
+  const stats = entry?.last?.snap?.stats
+  return stats?.status === STATUS.ERROR && stats?.are_all_errors_minor === true
+}
+
+// Overrides the miner_default counts so a miner that keeps hashing through a minor
+// error stays in the online bucket instead of being reported as broken. These live on
+// the `miner` spec because that is the only spec tag every whatsminer worker reports
+// (see worker-base getSpecTags); a per-model spec would run in addition to `miner` and
+// count the same miner twice.
+const minerStatusOps = {
+  online_or_minor_error_miners_cnt: {
+    op: 'cnt',
+    filter: function (entry) {
+      return (
+        isCounted(entry) &&
+        (entry?.last?.snap?.stats?.status === STATUS.MINING || isMiningWithMinorErrors(entry))
+      )
+    }
+  },
+  error_miners_cnt: {
+    op: 'cnt',
+    filter: function (entry) {
+      return (
+        isCounted(entry) &&
+        entry?.last?.snap?.stats?.status === STATUS.ERROR &&
+        !isMiningWithMinorErrors(entry)
+      )
+    }
+  }
+}
+
+// The container donut and the by-type breakdown bucket on the same status, so they
+// need the same treatment: a miner hashing through a minor error belongs in its power
+// mode slice, not in the error slice. Suffix is '' for the per-container ops
+// (error_cnt, power_mode_low_cnt) and '_type' for the per-type ops (error_type_cnt,
+// power_mode_low_type_cnt).
+function statusGroupOps (field, suffix) {
+  const group = groupBy(field)
+
+  const ops = {
+    [`error${suffix}_cnt`]: {
+      op: 'group_cnt',
+      group,
       filter: function (entry) {
         return (
-          entry?.last?.snap?.stats?.status === STATUS.MINING ||
-          checkIfAllErrorsAreMinor(entry, minorErrorCodesSet)
-        )
-      }
-    },
-    error_miners_cnt: {
-      op: 'cnt',
-      filter: function (entry) {
-        return (
+          isCounted(entry) &&
           entry?.last?.snap?.stats?.status === STATUS.ERROR &&
-          !checkIfAllErrorsAreMinor(entry, minorErrorCodesSet)
+          !isMiningWithMinorErrors(entry)
         )
       }
     }
   }
+
+  for (const mode of [POWER_MODE.LOW, POWER_MODE.NORMAL, POWER_MODE.HIGH]) {
+    // No maintenance filter here: miner_default's power mode counts do not have one
+    // either, and adding it would change what these widgets show beyond this fix.
+    ops[`power_mode_${mode}${suffix}_cnt`] = {
+      op: 'group_cnt',
+      group,
+      filter: function (entry) {
+        return (
+          (entry?.last?.snap?.stats?.status === STATUS.MINING ||
+            isMiningWithMinorErrors(entry)) &&
+          entry?.last?.snap?.config?.power_mode === mode
+        )
+      }
+    }
+  }
+
+  return ops
 }
 
 const sharedPoolStats = {
@@ -63,17 +110,11 @@ libStats.specs = {
   miner: {
     ops: {
       ...libStats.specs.miner_default.ops,
-      ...sharedPoolStats
+      ...sharedPoolStats,
+      ...minerStatusOps,
+      ...statusGroupOps('info.container', ''),
+      ...statusGroupOps('type', '_type')
     }
-  },
-  'miner-wm-m30s': {
-    ops: getSharedOps(MINOR_ERROR_CODES_M56S_M30_SET)
-  },
-  'miner-wm-m56s': {
-    ops: getSharedOps(MINOR_ERROR_CODES_M56S_M30_SET)
-  },
-  'miner-wm-m53s': {
-    ops: getSharedOps(MINOR_ERROR_CODES_M53_SET)
   },
   'miner-wm-m63': {
     ops: {
