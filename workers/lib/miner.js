@@ -641,9 +641,6 @@ class WhatsminerMiner extends BaseMiner {
   }
 
   async setPools (pools, appendId = true) {
-    // always use config pools
-    pools = this.conf.pools
-
     let oldPools = await this.getPools()
 
     oldPools = oldPools.map((pool) => ({
