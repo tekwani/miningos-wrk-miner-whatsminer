@@ -327,46 +327,46 @@ test('protocols/v3-handler - command transformation patterns', (t) => {
 })
 
 test('protocols/v3-handler - requestWrite uses username as account', async (t) => {
-  const CryptoJS = require('crypto-js')
+  const { sha256, aesEncrypt, aesDecryptHex } = require('../../workers/lib/utils/crypto')
   const handler = new WMApiV3({ rpc: {}, password: 'p', username: 'operator1' })
   handler.salt = 'somesalt'
-  const key = CryptoJS.SHA256('fixed').toString()
+  const key = sha256('fixed').toString('hex')
   handler._generateToken = () => ({ token: 'tok12345', key })
 
   let sent
   handler._requestMiner = async (cmd) => {
     sent = cmd
     const resp = JSON.stringify({ code: 0, msg: 'ok' })
-    return { enc: CryptoJS.AES.encrypt(resp, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString() }
+    return { enc: aesEncrypt(resp, key) }
   }
 
   const res = await handler.requestWrite('set.miner.power')
   t.is(res.code, 0, 'should return decrypted response')
 
   const hex2a = require('../../workers/lib/utils/hex2a')
-  const decrypted = CryptoJS.AES.decrypt(sent.data, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+  const decrypted = aesDecryptHex(sent.data, key)
   const cmdObj = JSON.parse(hex2a(decrypted))
   t.is(cmdObj.account, 'operator1', 'should use username as account')
 })
 
 test('protocols/v3-handler - requestWrite defaults account to super', async (t) => {
-  const CryptoJS = require('crypto-js')
+  const { sha256, aesEncrypt, aesDecryptHex } = require('../../workers/lib/utils/crypto')
   const handler = new WMApiV3({ rpc: {}, password: 'p' })
   handler.salt = 'somesalt'
-  const key = CryptoJS.SHA256('fixed').toString()
+  const key = sha256('fixed').toString('hex')
   handler._generateToken = () => ({ token: 'tok12345', key })
 
   let sent
   handler._requestMiner = async (cmd) => {
     sent = cmd
     const resp = JSON.stringify({ code: 0, msg: 'ok' })
-    return { enc: CryptoJS.AES.encrypt(resp, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString() }
+    return { enc: aesEncrypt(resp, key) }
   }
 
   await handler.requestWrite('set.miner.power')
 
   const hex2a = require('../../workers/lib/utils/hex2a')
-  const decrypted = CryptoJS.AES.decrypt(sent.data, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+  const decrypted = aesDecryptHex(sent.data, key)
   const cmdObj = JSON.parse(hex2a(decrypted))
   t.is(cmdObj.account, 'super', 'should default account to super')
 })

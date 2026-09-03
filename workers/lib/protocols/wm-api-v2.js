@@ -1,9 +1,9 @@
 'use strict'
 
-const CryptoJS = require('crypto-js')
 const WMApiBase = require('./wm-api-base')
 const md5 = require('../utils/md5')
 const hex2a = require('../utils/hex2a')
+const { aesEncrypt, aesDecryptHex } = require('../utils/crypto')
 const { API_VERSIONS, API_DEFAULTS, RESPONSE_CODES } = require('./constants')
 
 /**
@@ -92,7 +92,7 @@ class WMApiV2 extends WMApiBase {
           ...params
         })
         this.debugError(`Sending command ${cmd}`)
-        const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+        const data = aesEncrypt(cmd, key)
         const encCmd = {
           enc: 1,
           data
@@ -109,7 +109,7 @@ class WMApiV2 extends WMApiBase {
           throw new Error(this._getAPICodeMsg(res))
         }
 
-        const decrypted = CryptoJS.AES.decrypt(res.enc, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+        const decrypted = aesDecryptHex(res.enc, key)
         const response = JSON.parse(hex2a(decrypted))
         if (response.Code === RESPONSE_CODES.TOKEN_EXPIRED) {
           // Retry with fresh token
