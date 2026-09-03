@@ -1,6 +1,6 @@
 'use strict'
 
-const { proxyState, createErrorResponse, validateArgs } = require('../utils')
+const { proxyState, createSuccessResponse, createErrorResponse, validateArgs } = require('../utils')
 
 const args = [[
   'pool1',
@@ -20,6 +20,7 @@ module.exports = proxyState(function (ctx, state, req) {
       pool.URL = req[`pool${i + 1}`]
       pool.User = req[`worker${i + 1}`]
     })
+    return createSuccessResponse()
   } else {
     return createErrorResponse(132, 'API parse pools param error')
   }
