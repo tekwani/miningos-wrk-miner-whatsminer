@@ -1,8 +1,8 @@
 'use strict'
 
-const CryptoJS = require('crypto-js')
 const { cloneDeep } = require('@bitfinex/lib-js-util-base')
 const hex2a = require('../workers/lib/utils/hex2a')
+const { aesEncrypt, aesDecryptHex } = require('../workers/lib/utils/crypto')
 const crypto = require('crypto')
 
 function proxyState (fn) {
@@ -25,12 +25,12 @@ function randomNumber (min, max) {
 }
 
 function decryptCommand (cmd, key) {
-  const decrypted = CryptoJS.AES.decrypt(cmd.data, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+  const decrypted = aesDecryptHex(cmd.data, key)
   return JSON.parse(hex2a(decrypted))
 }
 
 function encryptResponse (data, key) {
-  const encrypted = CryptoJS.AES.encrypt(JSON.stringify(data), CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+  const encrypted = aesEncrypt(JSON.stringify(data), key)
   return JSON.stringify({
     enc: encrypted
   })

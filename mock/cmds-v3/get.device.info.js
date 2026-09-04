@@ -1,6 +1,6 @@
 'use strict'
 
-const CryptoJS = require('crypto-js')
+const { sha256 } = require('../../workers/lib/utils/crypto')
 const { createSuccessResponse } = require('../utils')
 
 /**
@@ -27,8 +27,8 @@ module.exports = function (ctx, state) {
   // V3: Generate SHA256-based token that miner will generate
   // token = first 8 chars of base64(SHA256(password + salt))
   if (ctx.password && ctx.validTokens) {
-    const tokenHash = CryptoJS.SHA256(ctx.password + salt)
-    const tokenBase64 = tokenHash.toString(CryptoJS.enc.Base64)
+    const tokenHash = sha256(ctx.password + salt)
+    const tokenBase64 = tokenHash.toString('base64')
     const tokenSign = tokenBase64.substring(0, 8)
     ctx.validTokens.add(tokenSign)
   }

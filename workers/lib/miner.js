@@ -5,8 +5,8 @@ const async = require('async')
 const net = require('node:net')
 const fs = require('node:fs')
 const path = require('node:path')
-const CryptoJS = require('crypto-js')
 const hex2a = require('./utils/hex2a')
+const { aesEncrypt, aesDecryptHex } = require('./utils/crypto')
 const readFirmware = require('./utils/firmware')
 const { getErrorMsg } = require('./utils')
 const {
@@ -183,7 +183,7 @@ class WhatsminerMiner extends BaseMiner {
       socket.on('data', (data) => {
         try {
           const decoded = JSON.parse(data)
-          const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+          const decrypted = aesDecryptHex(decoded.enc, key)
           const resp = JSON.parse(hex2a(decrypted))
           if (isResOK(resp) && resp.Msg === 'ready') {
             let fw
@@ -254,7 +254,7 @@ class WhatsminerMiner extends BaseMiner {
       token: sign,
       cmd: firmwareCmd
     })
-    const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+    const data = aesEncrypt(cmd, key)
     const encCmd = JSON.stringify({
       enc: 1,
       data
@@ -308,13 +308,13 @@ class WhatsminerMiner extends BaseMiner {
       const { token, key } = this.protocolHandler.generateTokenInfo(downloadCmd)
       const ts = Math.floor(Date.now() / 1000)
       const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: this.opts.username || V3_DEFAULT_ACCOUNT })
-      const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+      const data = aesEncrypt(cmd, key)
       return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
     }
 
     const { sign, key } = this.protocolHandler.getTokenInfo()
     const cmd = JSON.stringify({ token: sign, cmd: downloadCmd })
-    const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+    const data = aesEncrypt(cmd, key)
     return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
   }
 
@@ -384,7 +384,7 @@ class WhatsminerMiner extends BaseMiner {
         try {
           const decoded = JSON.parse(headerBuf.subarray(start, start + end).toString())
           if (decoded.enc) {
-            const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(decryptionKey), { mode: CryptoJS.mode.ECB }).toString()
+            const decrypted = aesDecryptHex(decoded.enc, decryptionKey)
             resp = JSON.parse(hex2a(decrypted))
           } else {
             resp = decoded
