@@ -6,7 +6,7 @@ const path = require('path')
 const yargs = require('yargs/yargs')
 const { hideBin } = require('yargs/helpers')
 const debug = require('debug')('mock')
-const CryptoJS = require('crypto-js')
+const { sha256 } = require('../workers/lib/utils/crypto')
 const { decryptCommand, encryptResponse } = require('./utils')
 const MockControlAgent = require('./mock-control-agent')
 const { promiseSleep } = require('@bitfinex/lib-js-util-promise')
@@ -29,7 +29,7 @@ const generateEncryptionKeyV2 = (password) => {
  */
 const generateEncryptionKeyV3 = (password) => {
   // V3 uses SHA256(password + salt)
-  return CryptoJS.SHA256(password + SALT).toString()
+  return sha256(password + SALT).toString('hex')
 }
 
 /**

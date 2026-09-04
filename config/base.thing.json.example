@@ -5,6 +5,10 @@
   "logKeepCount": 3,
   "thingRtdConcurrency": 500,
   "thresholdHashrate": 50000000,
+  "containerSubnets": {
+    "group-1": "10.182.0.0/24",
+    "group-2": "10.10.0.0/24"
+  },
   "alerts": {
     "miner-wm-m56s": {
       "pcb_temp_warning": {
@@ -1954,11 +1958,30 @@
       "chip_temp_protected": {
         "description": "Chip temp protected",
         "severity": "medium"
+      },
+      "custom.low_hashrate.warning": {
+        "description": "Miner hashrate too low",
+        "severity": "warning"
+      },
+      "custom.low_hashrate.critical": {
+        "description": "Miner hashrate too low",
+        "severity": "critical"
+      },
+      "custom.high_board_temp.warning": {
+        "description": "PCB temperature too high",
+        "severity": "warning"
+      },
+      "custom.high_board_temp.critical": {
+        "description": "PCB temperature too high",
+        "severity": "critical"
       }
     }
   },
   "miner": {
     "timeout": 30000,
+    "defaultUsername": "MINER_USERNAME",
+    "defaultPassword": "MINER_PASSWORD",
+    "overwriteCredsWithDefault": false,
     "pools": [
       {
         "url": "POOL_URL",

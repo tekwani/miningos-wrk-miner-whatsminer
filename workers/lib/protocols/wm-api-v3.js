@@ -1,9 +1,9 @@
 'use strict'
 
-const CryptoJS = require('crypto-js')
 const WMApiBase = require('./wm-api-base')
 const hex2a = require('../utils/hex2a')
-const { API_VERSIONS, API_DEFAULTS, COMMAND_MAP_V3, V3_STATUS_PARAMS, RESPONSE_CODES_V3 } = require('./constants')
+const { sha256, aesEncrypt, aesDecryptHex } = require('../utils/crypto')
+const { API_VERSIONS, API_DEFAULTS, COMMAND_MAP_V3, V3_STATUS_PARAMS, RESPONSE_CODES_V3, V3_DEFAULT_ACCOUNT } = require('./constants')
 
 /**
  * Protocol handler for Whatsminer API v3.0.3
@@ -85,11 +85,10 @@ class WMApiV3 extends WMApiBase {
    */
   _generateToken (command, timestamp) {
     const tokenInput = `${command}${this.password}${this.salt}${timestamp}`
-    const tokenHash = CryptoJS.SHA256(tokenInput)
-    const tokenBase64 = tokenHash.toString(CryptoJS.enc.Base64)
-    const token = tokenBase64.substring(0, 8)
+    const tokenHash = sha256(tokenInput)
+    const token = tokenHash.toString('base64').substring(0, 8)
     // Full SHA256 hash is used as AES encryption key
-    const key = tokenHash.toString()
+    const key = tokenHash.toString('hex')
 
     return { token, key }
   }
@@ -127,14 +126,14 @@ class WMApiV3 extends WMApiBase {
           cmd: command,
           ts,
           token,
-          account: 'super',
+          account: this.username || V3_DEFAULT_ACCOUNT,
           ...params
         }
 
         const cmd = JSON.stringify(cmdObj)
         this.debugError(`Sending command ${cmd}`)
 
-        const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+        const data = aesEncrypt(cmd, key)
         const encCmd = {
           enc: 1,
           data
@@ -151,7 +150,7 @@ class WMApiV3 extends WMApiBase {
           throw new Error(this._getAPICodeMsg(res))
         }
 
-        const decrypted = CryptoJS.AES.decrypt(res.enc, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+        const decrypted = aesDecryptHex(res.enc, key)
         const response = JSON.parse(hex2a(decrypted))
 
         const responseCode = response.code !== undefined ? response.code : response.Code

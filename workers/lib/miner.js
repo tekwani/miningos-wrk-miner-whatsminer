@@ -5,8 +5,8 @@ const async = require('async')
 const net = require('node:net')
 const fs = require('node:fs')
 const path = require('node:path')
-const CryptoJS = require('crypto-js')
 const hex2a = require('./utils/hex2a')
+const { aesEncrypt, aesDecryptHex } = require('./utils/crypto')
 const readFirmware = require('./utils/firmware')
 const { getErrorMsg } = require('./utils')
 const {
@@ -15,7 +15,7 @@ const {
   MINER_COOLING_TYPE_MAP,
   DOWNLOAD_LOGS
 } = require('./constants')
-const { RESPONSE_CODES_V2 } = require('./protocols/constants')
+const { RESPONSE_CODES_V2, V3_DEFAULT_ACCOUNT } = require('./protocols/constants')
 const { STATUS, POWER_MODE } = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/constants')
 const { ApiHandlerFactory, API_VERSIONS } = require('./protocols')
 
@@ -83,6 +83,7 @@ class WhatsminerMiner extends BaseMiner {
     this.protocolHandler = ApiHandlerFactory.create(this.apiVersion, {
       rpc: this.rpc,
       password: this.opts.password,
+      username: this.opts.username,
       debugError: this.debugError.bind(this)
     })
   }
@@ -182,7 +183,7 @@ class WhatsminerMiner extends BaseMiner {
       socket.on('data', (data) => {
         try {
           const decoded = JSON.parse(data)
-          const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+          const decrypted = aesDecryptHex(decoded.enc, key)
           const resp = JSON.parse(hex2a(decrypted))
           if (isResOK(resp) && resp.Msg === 'ready') {
             let fw
@@ -253,7 +254,7 @@ class WhatsminerMiner extends BaseMiner {
       token: sign,
       cmd: firmwareCmd
     })
-    const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+    const data = aesEncrypt(cmd, key)
     const encCmd = JSON.stringify({
       enc: 1,
       data
@@ -306,14 +307,14 @@ class WhatsminerMiner extends BaseMiner {
     if (this.apiVersion === API_VERSIONS.V3) {
       const { token, key } = this.protocolHandler.generateTokenInfo(downloadCmd)
       const ts = Math.floor(Date.now() / 1000)
-      const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: 'super' })
-      const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+      const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: this.opts.username || V3_DEFAULT_ACCOUNT })
+      const data = aesEncrypt(cmd, key)
       return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
     }
 
     const { sign, key } = this.protocolHandler.getTokenInfo()
     const cmd = JSON.stringify({ token: sign, cmd: downloadCmd })
-    const data = CryptoJS.AES.encrypt(cmd, CryptoJS.SHA256(key), { mode: CryptoJS.mode.ECB }).toString()
+    const data = aesEncrypt(cmd, key)
     return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }
   }
 
@@ -383,7 +384,7 @@ class WhatsminerMiner extends BaseMiner {
         try {
           const decoded = JSON.parse(headerBuf.subarray(start, start + end).toString())
           if (decoded.enc) {
-            const decrypted = CryptoJS.AES.decrypt(decoded.enc, CryptoJS.SHA256(decryptionKey), { mode: CryptoJS.mode.ECB }).toString()
+            const decrypted = aesDecryptHex(decoded.enc, decryptionKey)
             resp = JSON.parse(hex2a(decrypted))
           } else {
             resp = decoded
@@ -557,9 +558,11 @@ class WhatsminerMiner extends BaseMiner {
     const processedStats = {
       elapsed: summary.Elapsed,
       mhs_av: summary['MHS av'],
-      mhs_5s: summary['MHS 5s'],
+      // v3 firmware's v2-compat API drops MHS 5s/5m and Target MHS from
+      // summary; fall back to the closest equivalents (no-ops on v2 firmware)
+      mhs_5s: summary['MHS 5s'] ?? summary['HS RT'],
       mhs_1m: summary['MHS 1m'],
-      mhs_5m: summary['MHS 5m'],
+      mhs_5m: summary['MHS 5m'] ?? summary['MHS 1m'],
       mhs_15m: summary['MHS 15m'],
       prev_mhs: this._cachedPrevHashrate,
       hs_rt: summary['HS RT'],
@@ -579,7 +582,7 @@ class WhatsminerMiner extends BaseMiner {
       hash_stable_cost_seconds: summary['Hash Stable Cost Seconds'],
       hash_deviation: summary['Hash Deviation%'],
       target_freq: summary['Target Freq'],
-      target_mhs: summary['Target MHS'],
+      target_mhs: summary['Target MHS'] ?? (summary['Factory GHS'] != null ? summary['Factory GHS'] * 1000 : undefined),
       env_temp: summary['Env Temp'],
       power_mode: summary['Power Mode'],
       factory_ghs: summary['Factory GHS'],
@@ -929,11 +932,79 @@ class WhatsminerMiner extends BaseMiner {
     }
   }
 
+  /**
+   * v3 firmware's v2-compat edevs no longer include per-board chip temps,
+   * but the native v3 API (length-prefixed JSON frames on port 4433, reads
+   * unauthenticated) still reports the real values. Fetch just that one
+   * read so chip temps stay correct instead of approximated.
+   * @returns {Promise<Array|null>} v3 edevs entries or null if unavailable
+   */
+  async _getV3ChipTemps () {
+    const port = this.conf.v3ApiPort || 4433
+    const payload = Buffer.from(JSON.stringify({ cmd: 'get.miner.status', param: 'edevs' }))
+    const frame = Buffer.alloc(4 + payload.length)
+    frame.writeUInt32LE(payload.length, 0)
+    payload.copy(frame, 4)
+
+    const res = await new Promise((resolve, reject) => {
+      const socket = new net.Socket()
+      let buf = Buffer.alloc(0)
+      let settled = false
+      const settle = (err, val) => {
+        if (settled) return
+        settled = true
+        socket.destroy()
+        if (err) reject(err)
+        else resolve(val)
+      }
+      socket.setTimeout(this.opts.timeout || 5000, () => settle(new Error('ERR_V3_EDEVS_TIMEOUT')))
+      socket.on('error', (e) => settle(e))
+      socket.on('data', (data) => {
+        buf = buf.length ? Buffer.concat([buf, data]) : data
+        if (buf.length < 4) return
+        const len = buf.readUInt32LE(0)
+        if (len > 4 * 1024 * 1024) return settle(new Error('ERR_V3_EDEVS_RESPONSE_TOO_LARGE'))
+        if (buf.length >= 4 + len) {
+          try {
+            settle(null, JSON.parse(buf.subarray(4, 4 + len).toString()))
+          } catch (e) {
+            settle(e)
+          }
+        }
+      })
+      socket.connect(port, this.opts.address, () => socket.write(frame))
+    })
+
+    return res?.code === 0 && Array.isArray(res.msg?.edevs) ? res.msg.edevs : null
+  }
+
+  async _supplementChipTemps (devices) {
+    if (!devices.length || !devices.some(device => device.chip_temp_max === undefined)) {
+      return devices
+    }
+    try {
+      const v3Edevs = await this._getV3ChipTemps()
+      if (!v3Edevs) return devices
+      const bySlot = new Map(v3Edevs.map(dev => [dev.slot, dev]))
+      for (const device of devices) {
+        const v3 = bySlot.get(device.slot)
+        if (!v3) continue
+        device.chip_temp_min = device.chip_temp_min ?? v3['chip-temp-min']
+        device.chip_temp_max = device.chip_temp_max ?? v3['chip-temp-max']
+        device.chip_temp_avg = device.chip_temp_avg ?? v3['chip-temp-avg']
+      }
+    } catch (e) {
+      this.debugError('v3 chip temp supplement failed', e.message)
+    }
+    return devices
+  }
+
   async getDevices () {
     const res = await this._requestReadEndpoint('edevs')
 
-    return res?.DEVS?.map(device => ({
-      index: device.ASC,
+    const devices = res?.DEVS?.map(device => ({
+      // v3 firmware's v2-compat edevs have no ASC field, only Slot
+      index: device.ASC ?? device.Slot,
       slot: device.Slot,
       enabled: device.Enabled,
       status: device.Status,
@@ -955,6 +1026,8 @@ class WhatsminerMiner extends BaseMiner {
       chip_temp_avg: device['Chip Temp Avg'],
       chip_vol_diff: device.chip_vol_diff
     })) || []
+
+    return this._supplementChipTemps(devices)
   }
 
   async getDevicesInfo () {
@@ -1048,8 +1121,11 @@ class WhatsminerMiner extends BaseMiner {
   }
 
   checkIfAllErrorsAreMinor (errors) {
-    const minerType = this.opts.type
-    if (minerType.includes('m56s') || minerType.includes('m30')) {
+    const minerType = this.opts.type || ''
+    // m63/m63spp share the standard WhatsMiner error table with the m56s/m30 line.
+    // Leaving them out made every m63 error major, so a miner hashing with a minor
+    // error (e.g. 714 network_connection_unstable) was reported as broken.
+    if (minerType.includes('m56s') || minerType.includes('m30') || minerType.includes('m63')) {
       return errors.every(error => MINOR_ERROR_CODES_M56S_M30_SET.has(error))
     } else if (minerType.includes('m53')) {
       return errors.every(error => MINOR_ERROR_CODES_M53_SET.has(error))
@@ -1099,8 +1175,8 @@ class WhatsminerMiner extends BaseMiner {
         },
         temperature_c: {
           ambient: Math.floor(parseFloat(data.stats.env_temp) * 100) / 100,
-          max: Math.floor(Math.max(...data.devices.map((device) => parseFloat(device.chip_temp_max))) * 100) / 100,
-          avg: this._calcAvgTemp(data.devices),
+          max: this._calcMaxChipTemp(data.devices, data.stats),
+          avg: this._calcAvgTemp(data.devices, data.stats),
           chips: data.devices.map((device, index) => ({
             index,
             max: Math.floor(parseFloat(device.chip_temp_max) * 100) / 100,
@@ -1156,9 +1232,21 @@ class WhatsminerMiner extends BaseMiner {
     return Math.floor(parseFloat(stats.power) * 100) / 100
   }
 
-  _calcAvgTemp (devices) {
-    return Math.floor(devices.reduce((acc, device) =>
-      acc + parseFloat(device.chip_temp_avg), 0) / devices.length * 100) / 100
+  _calcAvgTemp (devices, stats) {
+    const avg = devices.reduce((acc, device) =>
+      acc + parseFloat(device.chip_temp_avg), 0) / devices.length
+    if (Number.isFinite(avg)) return Math.floor(avg * 100) / 100
+    // v3 firmware's v2-compat edevs omit per-board chip temps; summary still
+    // reports the miner-level Chip Temp Avg/Max
+    const summaryAvg = parseFloat(stats?.chip_temp_avg)
+    return Number.isFinite(summaryAvg) ? Math.floor(summaryAvg * 100) / 100 : null
+  }
+
+  _calcMaxChipTemp (devices, stats) {
+    const max = Math.max(...devices.map((device) => parseFloat(device.chip_temp_max)))
+    if (Number.isFinite(max)) return Math.floor(max * 100) / 100
+    const summaryMax = parseFloat(stats?.chip_temp_max)
+    return Number.isFinite(summaryMax) ? Math.floor(summaryMax * 100) / 100 : null
   }
 
   _getPowerMode (stats) {

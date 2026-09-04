@@ -146,6 +146,9 @@ const RESPONSE_CODES_V3 = {
 // Legacy alias for backward compatibility
 const RESPONSE_CODES = RESPONSE_CODES_V2
 
+// Default account used for V3 authenticated commands when no username is set
+const V3_DEFAULT_ACCOUNT = 'super'
+
 module.exports = {
   API_VERSIONS,
   DEFAULT_API_VERSION,
@@ -156,5 +159,6 @@ module.exports = {
   V3_STATUS_PARAMS,
   RESPONSE_CODES,
   RESPONSE_CODES_V2,
-  RESPONSE_CODES_V3
+  RESPONSE_CODES_V3,
+  V3_DEFAULT_ACCOUNT
 }
