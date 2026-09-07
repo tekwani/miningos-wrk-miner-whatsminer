@@ -1,5 +1,11 @@
 'use strict'
 
+const { getVal } = require('@tetherto/miningos-lib-stats/utils')
+
+function groupByMinerInfo (entry, ext) {
+  return `${getVal(ext, 'info.container')}-${getVal(ext, 'info.pos')}`
+}
+
 const ERROR_MAP = {
   110: 'hashrate_low',
   111: 'power_init_error',
@@ -395,6 +401,7 @@ function getAPICodeMsg (res) {
 }
 
 module.exports = {
+  groupByMinerInfo,
   getErrorMsg,
   getAPICodeMsg,
   ERROR_MAP,

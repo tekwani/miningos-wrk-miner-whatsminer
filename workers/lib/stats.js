@@ -6,11 +6,8 @@ const {
   POWER_MODE,
   MAINTENANCE
 } = require('@tetherto/miningos-tpl-wrk-miner/workers/lib/constants')
-const { getVal, groupBy } = require('@tetherto/miningos-lib-stats/utils')
-
-function groupByMinerInfo (entry, ext) {
-  return `${getVal(ext, 'info.container')}-${getVal(ext, 'info.pos')}`
-}
+const { groupBy } = require('@tetherto/miningos-lib-stats/utils')
+const { groupByMinerInfo } = require('./utils')
 
 function isCounted (entry) {
   return entry?.info?.container !== MAINTENANCE

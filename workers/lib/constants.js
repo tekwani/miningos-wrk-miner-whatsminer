@@ -10,6 +10,9 @@ const MINOR_ERROR_CODES_M53_SET = new Set(
   [202, 205, 217, 264, 265, 266, 267, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280]
 )
 
+const DAILY_STAT_KEY = 'stat-1D'
+const DAILY_POSITION_KEY = 'stat-position-1D'
+
 const DEFAULT_NOMINAL_EFFICIENCY_WTHS = {
   'miner-wm-m30sp': 33,
   'miner-wm-m30spp': 33,
@@ -33,6 +36,8 @@ const DOWNLOAD_LOGS = {
 }
 
 module.exports = {
+  DAILY_STAT_KEY,
+  DAILY_POSITION_KEY,
   MINOR_ERROR_CODES_M56S_M30_SET,
   MINOR_ERROR_CODES_M53_SET,
   DEFAULT_NOMINAL_EFFICIENCY_WTHS,

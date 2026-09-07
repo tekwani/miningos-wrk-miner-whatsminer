@@ -8,8 +8,11 @@ const LogCoreManager = require('./log-core-manager')
 const path = require('path')
 const fs = require('fs/promises')
 
+const lWrkFunLogs = require('@tetherto/miningos-tpl-wrk-thing/workers/lib/wrk-fun-logs')
+const { groupByMinerInfo } = require('./utils')
+
 const DEFAULT_PORT = 4028
-const { DEFAULT_NOMINAL_EFFICIENCY_WTHS } = require('./constants')
+const { DAILY_STAT_KEY, DAILY_POSITION_KEY, DEFAULT_NOMINAL_EFFICIENCY_WTHS } = require('./constants')
 const { ApiHandlerFactory } = require('./protocols')
 
 class WrkMinerRack extends WrkRack {
@@ -55,6 +58,46 @@ class WrkMinerRack extends WrkRack {
 
   getThingType () {
     return super.getThingType() + '-wm'
+  }
+
+  async buildStats (sk, fireTime) {
+    if (sk === DAILY_STAT_KEY) {
+      try {
+        await this.saveDailyPositionStats(fireTime)
+      } catch (e) {
+        this.debugError('ERR_DAILY_POSITION_STATS_SAVE', e)
+      }
+    }
+
+    return super.buildStats(sk, fireTime)
+  }
+
+  async saveDailyPositionStats (time) {
+    const ts = Math.floor(time.getTime() / 1000) * 1000
+    const row = {
+      ts,
+      status_group: {},
+      hashrate_mhs_1m_group: {},
+      power_w_group: {},
+      power_mode_group: {},
+      temperature_c_group: {}
+    }
+
+    for (const thg of Object.values(this.mem.things)) {
+      if (!thg?.info?.container || !thg.info.pos) continue
+
+      const key = groupByMinerInfo(null, thg)
+      const snap = thg.last?.snap
+      const stats = snap?.stats
+
+      if (stats?.status !== undefined) row.status_group[key] = stats.status
+      if (stats?.hashrate_mhs?.t_1m !== undefined) row.hashrate_mhs_1m_group[key] = stats.hashrate_mhs.t_1m
+      if (stats?.power_w !== undefined) row.power_w_group[key] = stats.power_w
+      if (snap?.config?.power_mode !== undefined) row.power_mode_group[key] = snap.config.power_mode
+      if (stats?.temperature_c) row.temperature_c_group[key] = stats.temperature_c
+    }
+
+    await lWrkFunLogs.saveLogData.call(this, `${DAILY_POSITION_KEY}-t-miner`, ts, row, 0, true)
   }
 
   getThingTags () {
