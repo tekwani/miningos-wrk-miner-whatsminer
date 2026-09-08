@@ -102,6 +102,96 @@ libAlerts.specs.miner = {
       const threshold = configuredParams.maxTempC
       return snap.stats.temperature_c?.pcb?.some((t) => t.current > threshold)
     }
+  },
+  'custom.chip_temp.warning': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.chip_temp.warning']
+      const enabled = configuredParams?.enabled
+
+      return enabled && libUtils.isValidSnap(snap) && !libUtils.isOffline(snap)
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.chip_temp.warning']
+      const a = (
+        (snap.config.power_mode === 'low' && snap.stats.temperature_c?.chips?.some((t) => t.avg > configuredParams.lowTemp)) ||
+        (snap.config.power_mode === 'high' && snap.stats.temperature_c?.chips?.some((t) => t.avg > configuredParams.highTemp)) ||
+        (snap.config.power_mode === 'normal' && snap.stats.temperature_c?.chips?.some((t) => t.avg > configuredParams.normalTemp))
+      )
+      return a || false
+    }
+  },
+  'custom.chip_temp.critical': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.chip_temp.critical']
+      const enabled = configuredParams?.enabled
+
+      return enabled && libUtils.isValidSnap(snap) && !libUtils.isOffline(snap)
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.chip_temp.critical']
+      const a = (
+        (snap.config.power_mode === 'low' && snap.stats.temperature_c?.chips?.some((t) => t.avg > configuredParams.lowTemp)) ||
+        (snap.config.power_mode === 'high' && snap.stats.temperature_c?.chips?.some((t) => t.avg > configuredParams.highTemp)) ||
+        (snap.config.power_mode === 'normal' && snap.stats.temperature_c?.chips?.some((t) => t.avg > configuredParams.normalTemp))
+      )
+      return a || false
+    }
+  },
+  'custom.low_power.warning': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.low_power.warning']
+      const enabled = configuredParams?.enabled
+
+      return enabled && isMining(snap) &&
+        snap.stats.uptime_ms > MIN_10_MS && targetPowerW(snap) > 0
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.low_power.warning']
+      const threshold = targetPowerW(snap) * (configuredParams.lowPower / 100)
+      return snap.stats.power_w < threshold
+    }
+  },
+  'custom.low_power.critical': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.low_power.critical']
+      const enabled = configuredParams?.enabled
+
+      return enabled && isMining(snap) &&
+        snap.stats.uptime_ms > MIN_10_MS && targetPowerW(snap) > 0
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.low_power.critical']
+      const threshold = targetPowerW(snap) * (configuredParams.lowPower / 100)
+      return snap.stats.power_w < threshold
+    }
+  },
+  'custom.high_efficiency.warning': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_efficiency.warning']
+      const enabled = configuredParams?.enabled
+
+      return enabled && isMining(snap) &&
+        snap.stats.uptime_ms > MIN_30_MS && snap.stats.nominal_efficiency_w_ths > 0
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_efficiency.warning']
+      const threshold = snap.stats.nominal_efficiency_w_ths * (configuredParams.highEfficiency / 100)
+      return snap.stats.efficiency_w_ths > threshold
+    }
+  },
+  'custom.high_efficiency.critical': {
+    valid: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_efficiency.critical']
+      const enabled = configuredParams?.enabled
+
+      return enabled && isMining(snap) &&
+        snap.stats.uptime_ms > MIN_30_MS && snap.stats.nominal_efficiency_w_ths > 0
+    },
+    probe: (ctx, snap) => {
+      const configuredParams = ctx.configuredParams['custom.high_efficiency.critical']
+      const threshold = snap.stats.nominal_efficiency_w_ths * (configuredParams.highEfficiency / 100)
+      return snap.stats.efficiency_w_ths > threshold
+    }
   }
 }
 

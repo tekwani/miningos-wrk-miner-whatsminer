@@ -460,3 +460,194 @@ for (const key of ['custom.high_board_temp.warning', 'custom.high_board_temp.cri
     t.absent(spec.probe(ctx, snap), 'should not trigger when no pcb temperature data')
   })
 }
+
+for (const key of ['custom.chip_temp.warning', 'custom.chip_temp.critical']) {
+  const cfg = { lowTemp: 60, normalTemp: 70, highTemp: 80 }
+
+  test(`${key} alert - exists with valid and probe functions`, (t) => {
+    const spec = alerts.specs.miner[key]
+    t.ok(spec, 'should exist')
+    t.ok(typeof spec.valid === 'function', 'should have valid function')
+    t.ok(typeof spec.probe === 'function', 'should have probe function')
+  })
+
+  test(`${key} alert - valid is false when not enabled`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: false, ...cfg } } }
+      const snap = { stats: { status: 'mining', temperature_c: { chips: [{ avg: 90 }] } } }
+      t.not(spec.valid(ctx, snap), 'should not be valid when disabled')
+    })
+  })
+
+  test(`${key} alert - valid is false when configuredParams is missing entirely`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: {} }
+      const snap = { stats: { status: 'mining', temperature_c: { chips: [{ avg: 90 }] } } }
+      t.not(spec.valid(ctx, snap), 'should not be valid when configuredParams is missing')
+    })
+  })
+
+  test(`${key} alert - valid is true when enabled and snap is valid`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, ...cfg } } }
+      const snap = { stats: { status: 'mining', temperature_c: { chips: [{ avg: 90 }] } } }
+      t.ok(spec.valid(ctx, snap), 'should be valid when enabled and snap is valid')
+    })
+  })
+
+  test(`${key} alert - valid is false when offline`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, ...cfg } } }
+      const snap = { stats: { status: 'offline', temperature_c: { chips: [{ avg: 90 }] } } }
+      t.not(spec.valid(ctx, snap), 'should not be valid when offline')
+    })
+  })
+
+  test(`${key} alert - valid is false for an invalid snap`, (t) => {
+    const spec = alerts.specs.miner[key]
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, ...cfg } } }
+      t.not(spec.valid(ctx, null), 'should not be valid for null snap')
+      t.not(spec.valid(ctx, {}), 'should not be valid for snap without stats')
+    })
+  })
+
+  test(`${key} alert - probe triggers for low power mode above lowTemp`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: cfg } }
+    const snap = { config: { power_mode: 'low' }, stats: { temperature_c: { chips: [{ avg: 65 }] } } }
+    t.ok(spec.probe(ctx, snap), 'should trigger for low power mode with high chip temp')
+  })
+
+  test(`${key} alert - probe triggers for normal power mode above normalTemp`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: cfg } }
+    const snap = { config: { power_mode: 'normal' }, stats: { temperature_c: { chips: [{ avg: 75 }] } } }
+    t.ok(spec.probe(ctx, snap), 'should trigger for normal power mode with high chip temp')
+  })
+
+  test(`${key} alert - probe triggers for high power mode above highTemp`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: cfg } }
+    const snap = { config: { power_mode: 'high' }, stats: { temperature_c: { chips: [{ avg: 85 }] } } }
+    t.ok(spec.probe(ctx, snap), 'should trigger for high power mode with high chip temp')
+  })
+
+  test(`${key} alert - probe does not trigger when temp is below threshold`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: cfg } }
+    const snap = { config: { power_mode: 'normal' }, stats: { temperature_c: { chips: [{ avg: 50 }] } } }
+    t.not(spec.probe(ctx, snap), 'should not trigger for temperature below threshold')
+  })
+
+  test(`${key} alert - probe does not trigger with no chip temperature data`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: cfg } }
+    const snap = { config: { power_mode: 'normal' }, stats: {} }
+    t.not(spec.probe(ctx, snap), 'should not trigger when no temperature data')
+  })
+
+  test(`${key} alert - probe triggers when any chip reading is above threshold`, (t) => {
+    const spec = alerts.specs.miner[key]
+    const ctx = { configuredParams: { [key]: { normalTemp: 70 } } }
+    const snap = {
+      config: { power_mode: 'normal' },
+      stats: { temperature_c: { chips: [{ avg: 50 }, { avg: 75 }] } }
+    }
+    t.ok(spec.probe(ctx, snap), 'should trigger when any chip temp is above threshold')
+  })
+}
+
+for (const key of ['custom.low_power.warning', 'custom.low_power.critical']) {
+  test(`${key} alert - exists with valid and probe functions`, (t) => {
+    const spec = alerts.specs.miner[key]
+    t.ok(spec, 'should exist')
+    t.ok(typeof spec.valid === 'function', 'should have valid function')
+    t.ok(typeof spec.probe === 'function', 'should have probe function')
+  })
+
+  test(`${key} alert - valid and probe`, (t) => {
+    const spec = alerts.specs.miner[key]
+
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, lowPower: 80 } } }
+      // nominal 20 W/THs * 100 THs (100,000,000 MHS) target => 2000 W target, threshold 1600 W
+      const base = {
+        stats: {
+          status: 'mining',
+          uptime_ms: MIN_10_MS + 1,
+          nominal_efficiency_w_ths: 20,
+          hashrate_mhs: { target: 100_000_000, avg: 100_000_000 },
+          power_w: 1500
+        }
+      }
+      t.ok(spec.valid(ctx, base), 'valid when enabled, mining > 10 min with a derivable target power')
+      t.ok(spec.probe(ctx, base), 'triggers when power below 80% of target')
+
+      const okPower = { stats: { ...base.stats, power_w: 1800 } }
+      t.not(spec.probe(ctx, okPower), 'does not trigger when power above threshold')
+
+      const disabled = { configuredParams: { [key]: { enabled: false, lowPower: 80 } } }
+      t.not(spec.valid(disabled, base), 'not valid when disabled')
+
+      const noConfiguredParams = { configuredParams: {} }
+      t.not(spec.valid(noConfiguredParams, base), 'not valid when configuredParams is missing')
+
+      const tooEarly = { stats: { ...base.stats, uptime_ms: MIN_10_MS - 1 } }
+      t.not(spec.valid(ctx, tooEarly), 'not valid before 10 min of mining')
+
+      const noTarget = { stats: { ...base.stats, nominal_efficiency_w_ths: 0 } }
+      t.not(spec.valid(ctx, noTarget), 'not valid without a derivable target power')
+
+      const offline = { stats: { ...base.stats, status: 'offline' } }
+      t.not(spec.valid(ctx, offline), 'not valid when offline')
+    })
+  })
+}
+
+for (const key of ['custom.high_efficiency.warning', 'custom.high_efficiency.critical']) {
+  test(`${key} alert - exists with valid and probe functions`, (t) => {
+    const spec = alerts.specs.miner[key]
+    t.ok(spec, 'should exist')
+    t.ok(typeof spec.valid === 'function', 'should have valid function')
+    t.ok(typeof spec.probe === 'function', 'should have probe function')
+  })
+
+  test(`${key} alert - valid and probe`, (t) => {
+    const spec = alerts.specs.miner[key]
+
+    withMiningMocks(() => {
+      const ctx = { configuredParams: { [key]: { enabled: true, highEfficiency: 125 } } }
+      // nominal 20 W/THs => threshold 25 W/THs
+      const base = {
+        stats: {
+          status: 'mining',
+          uptime_ms: MIN_30_MS + 1,
+          nominal_efficiency_w_ths: 20,
+          efficiency_w_ths: 30
+        }
+      }
+      t.ok(spec.valid(ctx, base), 'valid when enabled, mining > 30 min with a nominal efficiency')
+      t.ok(spec.probe(ctx, base), 'triggers when efficiency above 125% of nominal')
+
+      const okEff = { stats: { ...base.stats, efficiency_w_ths: 22 } }
+      t.not(spec.probe(ctx, okEff), 'does not trigger when efficiency within range')
+
+      const disabled = { configuredParams: { [key]: { enabled: false, highEfficiency: 125 } } }
+      t.not(spec.valid(disabled, base), 'not valid when disabled')
+
+      const noConfiguredParams = { configuredParams: {} }
+      t.not(spec.valid(noConfiguredParams, base), 'not valid when configuredParams is missing')
+
+      const tooEarly = { stats: { ...base.stats, uptime_ms: MIN_30_MS - 1 } }
+      t.not(spec.valid(ctx, tooEarly), 'not valid before 30 min of mining')
+
+      const noNominal = { stats: { ...base.stats, nominal_efficiency_w_ths: 0 } }
+      t.not(spec.valid(ctx, noNominal), 'not valid without a nominal efficiency')
+    })
+  })
+}

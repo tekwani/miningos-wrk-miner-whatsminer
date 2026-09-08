@@ -1974,6 +1974,62 @@
       "custom.high_board_temp.critical": {
         "description": "PCB temperature too high",
         "severity": "critical"
+      },
+      "custom.chip_temp.warning": {
+        "description": "Chip temperature warning",
+        "severity": "warning"
+      },
+      "custom.chip_temp.critical": {
+        "description": "Chip temperature warning",
+        "severity": "critical"
+      },
+      "custom.low_power.warning": {
+        "description": "Miner power too low",
+        "severity": "warning"
+      },
+      "custom.low_power.critical": {
+        "description": "Miner power too low",
+        "severity": "critical"
+      },
+      "custom.high_efficiency.warning": {
+        "description": "Miner efficiency is too high",
+        "severity": "warning"
+      },
+      "custom.high_efficiency.critical": {
+        "description": "Miner efficiency is too high",
+        "severity": "critical"
+      },
+      "custom.wrong_miner_pool.warning": {
+        "description": "Some Miner pools do not correspond to correct pool IP.",
+        "severity": "warning"
+      },
+      "custom.wrong_miner_pool.critical": {
+        "description": "Some Miner pools do not correspond to correct pool IP.",
+        "severity": "critical"
+      },
+      "custom.wrong_miner_subaccount.warning": {
+        "description": "Miner subaccount is not correct.",
+        "severity": "warning"
+      },
+      "custom.wrong_miner_subaccount.critical": {
+        "description": "Miner subaccount is not correct.",
+        "severity": "critical"
+      },
+      "custom.wrong_worker_name.warning": {
+        "description": "Worker name does not correspond to MiningOS ID.",
+        "severity": "warning"
+      },
+      "custom.wrong_worker_name.critical": {
+        "description": "Worker name does not correspond to MiningOS ID.",
+        "severity": "critical"
+      },
+      "custom.ip_worker_name.warning": {
+        "description": "Worker name corresponds to IP instead of MiningOS ID.",
+        "severity": "warning"
+      },
+      "custom.ip_worker_name.critical": {
+        "description": "Worker name corresponds to IP instead of MiningOS ID.",
+        "severity": "critical"
       }
     }
   },
