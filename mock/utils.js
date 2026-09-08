@@ -4,6 +4,7 @@ const { cloneDeep } = require('@bitfinex/lib-js-util-base')
 const hex2a = require('../workers/lib/utils/hex2a')
 const { aesEncrypt, aesDecryptHex } = require('../workers/lib/utils/crypto')
 const crypto = require('crypto')
+const zlib = require('zlib')
 
 function proxyState (fn) {
   return function (ctx, state, req, id) {
@@ -458,9 +459,34 @@ function updateActiveSummary (newState, avgHashrate, libUtils, useHashrateHelper
   }
 }
 
+// Minimal ustar entry (single file) gzipped, so tests can serve an archive payload
+// the way real Whatsminer firmware does
+function buildTarGzArchive (fileName, content) {
+  const body = Buffer.isBuffer(content) ? content : Buffer.from(content)
+  const header = Buffer.alloc(512)
+  header.write(fileName, 0, 100, 'utf8')
+  header.write('0000644 ', 100, 8, 'ascii')
+  header.write('0000000 ', 108, 8, 'ascii')
+  header.write('0000000 ', 116, 8, 'ascii')
+  header.write(body.length.toString(8).padStart(11, '0') + ' ', 124, 12, 'ascii')
+  header.write(Math.floor(Date.now() / 1000).toString(8).padStart(11, '0') + ' ', 136, 12, 'ascii')
+  header.fill(' ', 148, 156)
+  header.write('0', 156, 1, 'ascii')
+  header.write('ustar', 257, 5, 'ascii')
+  header.write('00', 263, 2, 'ascii')
+
+  let checksum = 0
+  for (const byte of header) checksum += byte
+  header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii')
+
+  const padding = Buffer.alloc((512 - (body.length % 512)) % 512)
+  return zlib.gzipSync(Buffer.concat([header, body, padding, Buffer.alloc(1024)]))
+}
+
 module.exports = {
   proxyState,
   randomNumber,
+  buildTarGzArchive,
   decryptCommand,
   encryptResponse,
   cleanup,

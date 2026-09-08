@@ -1,6 +1,6 @@
 'use strict'
 
-const { createSuccessResponse } = require('../utils')
+const { createSuccessResponse, buildTarGzArchive } = require('../utils')
 
 /**
  * V2 API download_logs command handler
@@ -26,6 +26,11 @@ module.exports = function (ctx, state) {
       Buffer.alloc(ctx.dlLogSizeBytes - mockLogContent.length, 0x41),
       mockLogContent
     ])
+  }
+
+  // ctx.dlPayloadFormat = 'tar.gz' serves the archive shape real firmware produces
+  if (ctx.dlPayloadFormat === 'tar.gz') {
+    mockLogContent = buildTarGzArchive('miner.log', mockLogContent)
   }
 
   const response = createSuccessResponse({

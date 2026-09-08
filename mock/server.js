@@ -202,8 +202,8 @@ if (require.main === module) {
   agent.init(runServer)
 } else {
   module.exports = {
-    createServer ({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes }) {
-      return runServer({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes })
+    createServer ({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes, dlPayloadFormat }) {
+      return runServer({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes, dlPayloadFormat })
     }
   }
 }
@@ -224,7 +224,8 @@ function runServer (argv, ops = {}) {
     password: argv.password || defaultPassword,
     apiVersion,
     dlFault: argv.dlFault || null,
-    dlLogSizeBytes: argv.dlLogSizeBytes || null
+    dlLogSizeBytes: argv.dlLogSizeBytes || null,
+    dlPayloadFormat: argv.dlPayloadFormat || null
   }
 
   const STATE = {}

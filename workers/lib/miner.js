@@ -9,6 +9,7 @@ const hex2a = require('./utils/hex2a')
 const { aesEncrypt, aesDecryptHex } = require('./utils/crypto')
 const readFirmware = require('./utils/firmware')
 const { getErrorMsg } = require('./utils')
+const { detectLogFormat } = require('./log-format')
 const {
   MINOR_ERROR_CODES_M56S_M30_SET,
   MINOR_ERROR_CODES_M53_SET,
@@ -462,10 +463,19 @@ class WhatsminerMiner extends BaseMiner {
       if (!logCoreManager) throw new Error('ERR_LOG_CORE_MANAGER_NOT_READY')
       const meta = await logCoreManager.serveLog(logBuffer, this.opts.id)
 
-      // Also write a local debug file (metadata only, not raw bytes)
-      this._saveResponseFile(meta)
+      // The firmware decides the payload format (plain text or a gzipped tar of the
+      // log directory), so it is detected once here and declared in the result
+      const { extension, contentType } = detectLogFormat(logBuffer)
+      const data = {
+        ...meta,
+        fileName: `miner-log-${this.opts.id}-${Date.now()}.${extension}`,
+        contentType
+      }
 
-      return { success: true, data: meta }
+      // Also write a local debug file (metadata only, not raw bytes)
+      this._saveResponseFile(data)
+
+      return { success: true, data }
     } catch (e) {
       this.debugError('downloadLogs error', e)
       return { success: false, error_msg: e.message }
