@@ -108,7 +108,7 @@ const sendDownloadLogsResponse = async (socket, res, binaryData, encryptionKey, 
   if (fault === 'empty') {
     if (res.Msg && typeof res.Msg === 'object') res.Msg.logfilelen = '0'
     if (res.msg && typeof res.msg === 'object') res.msg.logfilelen = '0'
-    socket.end(isEncrypted ? encryptResponse(res, encryptionKey) : JSON.stringify(res))
+    socket.end(isEncrypted ? encryptResponse(res, encryptionKey, CTX.dlEncPadding) : JSON.stringify(res))
     return
   }
 
@@ -117,7 +117,7 @@ const sendDownloadLogsResponse = async (socket, res, binaryData, encryptionKey, 
     return
   }
 
-  const json = Buffer.from(isEncrypted ? encryptResponse(res, encryptionKey) : JSON.stringify(res))
+  const json = Buffer.from(isEncrypted ? encryptResponse(res, encryptionKey, CTX.dlEncPadding) : JSON.stringify(res))
 
   if (fault === 'coalesce') {
     socket.end(Buffer.concat([json, binaryData]))
@@ -202,8 +202,8 @@ if (require.main === module) {
   agent.init(runServer)
 } else {
   module.exports = {
-    createServer ({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes, dlPayloadFormat }) {
-      return runServer({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes, dlPayloadFormat })
+    createServer ({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes, dlPayloadFormat, dlEncPadding }) {
+      return runServer({ port, host, type, serial, password, apiVersion, dlFault, dlLogSizeBytes, dlPayloadFormat, dlEncPadding })
     }
   }
 }
@@ -225,7 +225,8 @@ function runServer (argv, ops = {}) {
     apiVersion,
     dlFault: argv.dlFault || null,
     dlLogSizeBytes: argv.dlLogSizeBytes || null,
-    dlPayloadFormat: argv.dlPayloadFormat || null
+    dlPayloadFormat: argv.dlPayloadFormat || null,
+    dlEncPadding: argv.dlEncPadding || null
   }
 
   const STATE = {}

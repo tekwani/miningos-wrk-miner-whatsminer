@@ -306,8 +306,9 @@ class WhatsminerMiner extends BaseMiner {
     const downloadCmd = this.protocolHandler.transformCommand('download_logs')
 
     if (this.apiVersion === API_VERSIONS.V3) {
-      const { token, key } = this.protocolHandler.generateTokenInfo(downloadCmd)
-      const ts = Math.floor(Date.now() / 1000)
+      // The token hashes the ts it was generated with — reuse that ts in the
+      // payload, a fresh Date.now() can land on the next second and invalidate it
+      const { token, key, ts } = this.protocolHandler.generateTokenInfo(downloadCmd)
       const cmd = JSON.stringify({ cmd: downloadCmd, ts, token, account: this.opts.username || V3_DEFAULT_ACCOUNT })
       const data = aesEncrypt(cmd, key)
       return { encCmd: JSON.stringify({ enc: 1, data }), decryptionKey: key }

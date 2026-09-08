@@ -12,7 +12,7 @@ const LOG_SUFFIX = '--- End of Log ---\n'
 let nextPort = 14060
 
 // Boots a mock miner (with optional download-logs fault injection) and a Miner instance
-async function setup (t, { dlFault = null, dlLogSizeBytes = null, dlPayloadFormat = null, minerConf = {}, getLogCoreManager } = {}) {
+async function setup (t, { dlFault = null, dlLogSizeBytes = null, dlPayloadFormat = null, dlEncPadding = null, minerConf = {}, getLogCoreManager } = {}) {
   const port = nextPort++
   const mock = srv.createServer({
     host: HOST,
@@ -23,7 +23,8 @@ async function setup (t, { dlFault = null, dlLogSizeBytes = null, dlPayloadForma
     apiVersion: 'v2',
     dlFault,
     dlLogSizeBytes,
-    dlPayloadFormat
+    dlPayloadFormat,
+    dlEncPadding
   })
 
   const miner = new Miner({
@@ -131,6 +132,12 @@ test('downloadLogs - stalled binary phase times out with ERR_DOWNLOAD_LOGS_TIMEO
     /ERR_DOWNLOAD_LOGS_TIMEOUT/,
     'should reject with ERR_DOWNLOAD_LOGS_TIMEOUT'
   )
+})
+
+test('downloadLogs - zero-padded response header (2026 REL2 firmware) still downloads', async (t) => {
+  const { miner } = await setup(t, { dlEncPadding: 'zero' })
+  const result = await miner._requestDownloadLogs()
+  assertFullLog(t, result)
 })
 
 test('downloadLogs - repeated downloads on the same miner are deterministic', async (t) => {

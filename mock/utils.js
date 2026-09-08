@@ -2,7 +2,7 @@
 
 const { cloneDeep } = require('@bitfinex/lib-js-util-base')
 const hex2a = require('../workers/lib/utils/hex2a')
-const { aesEncrypt, aesDecryptHex } = require('../workers/lib/utils/crypto')
+const { sha256, aesEncrypt, aesDecryptHex } = require('../workers/lib/utils/crypto')
 const crypto = require('crypto')
 const zlib = require('zlib')
 
@@ -30,8 +30,18 @@ function decryptCommand (cmd, key) {
   return JSON.parse(hex2a(decrypted))
 }
 
-function encryptResponse (data, key) {
-  const encrypted = aesEncrypt(JSON.stringify(data), key)
+// Zero-padded AES like firmware 2026xx REL2 produces (no PKCS#7)
+function aesEncryptZeroPad (plaintext, key) {
+  const data = Buffer.from(plaintext, 'utf8')
+  const padded = Buffer.concat([data, Buffer.alloc((16 - (data.length % 16)) % 16)])
+  const cipher = crypto.createCipheriv('aes-256-ecb', sha256(key), null)
+  cipher.setAutoPadding(false)
+  return Buffer.concat([cipher.update(padded), cipher.final()]).toString('base64')
+}
+
+function encryptResponse (data, key, padding) {
+  const json = JSON.stringify(data)
+  const encrypted = padding === 'zero' ? aesEncryptZeroPad(json, key) : aesEncrypt(json, key)
   return JSON.stringify({
     enc: encrypted
   })
@@ -487,6 +497,7 @@ module.exports = {
   proxyState,
   randomNumber,
   buildTarGzArchive,
+  aesEncryptZeroPad,
   decryptCommand,
   encryptResponse,
   cleanup,
