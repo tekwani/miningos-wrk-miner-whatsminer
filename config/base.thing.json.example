@@ -2035,6 +2035,7 @@
   },
   "miner": {
     "timeout": 30000,
+    "snapConcurrency": 3, 
     "defaultUsername": "MINER_USERNAME",
     "defaultPassword": "MINER_PASSWORD",
     "overwriteCredsWithDefault": false,

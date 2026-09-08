@@ -1153,7 +1153,7 @@ class WhatsminerMiner extends BaseMiner {
       miner_info: this.getMinerInfo.bind(this),
       version: this.getVersion.bind(this),
       miner_status: this.getMinerStatus.bind(this)
-    }, 3)
+    }, this.conf.snapConcurrency || 3)
 
     this._handleErrorUpdates(data.errors)
 
