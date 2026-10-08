@@ -12,7 +12,7 @@ const lWrkFunLogs = require('@tetherto/miningos-tpl-wrk-thing/workers/lib/wrk-fu
 const { groupByMinerInfo } = require('./utils')
 
 const DEFAULT_PORT = 4028
-const { DAILY_STAT_KEY, DAILY_POSITION_KEY, DEFAULT_NOMINAL_EFFICIENCY_WTHS } = require('./constants')
+const { DAILY_STAT_KEY, DAILY_POSITION_KEY, DEFAULT_NOMINAL_EFFICIENCY_WTHS, MINER_API_RES_RPC } = require('./constants')
 const { ApiHandlerFactory } = require('./protocols')
 
 class WrkMinerRack extends WrkRack {
@@ -41,6 +41,10 @@ class WrkMinerRack extends WrkRack {
           ['setPowerPct', 1],
           ['downloadLogs', 1]
         ])
+
+        this.net_r0.rpcServer.respond(MINER_API_RES_RPC, async (req) => {
+          return await this.net_r0.handleReply(MINER_API_RES_RPC, req)
+        })
 
         next()
       }
@@ -195,6 +199,18 @@ class WrkMinerRack extends WrkRack {
     thg.ctrl = miner
 
     return 1
+  }
+
+  async getMinerApiRes (req) {
+    const { api, serialNum } = req
+    if (!serialNum) throw new Error('ERR_INVALID_MINER_SERIAL')
+
+    const thg = Object.values(this.mem.things).find(v => v.info?.serialNum === serialNum)
+    if (!thg) throw new Error('ERR_MINER_NOT_FOUND')
+    if (!thg.ctrl) throw new Error('ERR_MINER_NOT_SETUP')
+
+    if (!api || !thg.ctrl?.apiRes?.[api]) throw new Error('ERR_INVALID_MINER_API')
+    return thg.ctrl.apiRes[api]
   }
 
   async getFirmwareById (id) {

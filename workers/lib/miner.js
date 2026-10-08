@@ -71,6 +71,7 @@ class WhatsminerMiner extends BaseMiner {
     this.protocolHandler = null
     this._cachedPrevHashrate = null
     this.cachedShares = { accepted: 0, rejected: 0, stale: 0 }
+    this.apiRes = {}
   }
 
   /**
@@ -233,7 +234,13 @@ class WhatsminerMiner extends BaseMiner {
 
     const res = await this.protocolHandler.requestRead(cmd, params)
     this.updateLastSeen()
+    this.saveApiResponse(command, res)
     return this.protocolHandler.parseResponse(res, command)
+  }
+
+  saveApiResponse (command, res) {
+    if (!this.conf?.storeMinerApiData) return
+    this.apiRes[command] = res
   }
 
   async _requestWriteEndpoint (command, additionalParams = {}, json = true) {

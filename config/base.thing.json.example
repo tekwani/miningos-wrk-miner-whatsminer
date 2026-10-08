@@ -2008,6 +2008,7 @@
     "defaultUsername": "MINER_USERNAME",
     "defaultPassword": "MINER_PASSWORD",
     "overwriteCredsWithDefault": false,
+    "storeMinerApiData": false,
     "pools": [
       {
         "url": "POOL_URL",

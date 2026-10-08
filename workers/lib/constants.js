@@ -35,6 +35,8 @@ const DOWNLOAD_LOGS = {
   RETRY_BACKOFF_MS: 200
 }
 
+const MINER_API_RES_RPC = 'getMinerApiRes'
+
 module.exports = {
   DAILY_STAT_KEY,
   DAILY_POSITION_KEY,
@@ -44,5 +46,6 @@ module.exports = {
   MINER_COOLING_TYPE_MAP,
   DOWNLOAD_LOGS,
   API_VERSIONS,
-  API_DEFAULTS
+  API_DEFAULTS,
+  MINER_API_RES_RPC
 }
