@@ -192,6 +192,88 @@ test('protocols/v2-handler - _getAPICodeMsg', (t) => {
   t.is(handler._getAPICodeMsg({ Code: 999 }), 'ERR_UNKNOWN_CODE_999', 'should return unknown for 999')
 })
 
+test('protocols/v2-handler - refreshToken stores a new token and rethrows', async (t) => {
+  const handler = new WMApiV2({ rpc: {}, password: 'admin' })
+  handler.authenticate = async () => {
+    handler.token = { token: 't', sign: 's', key: 'k' }
+    return handler.token
+  }
+  await handler.refreshToken()
+  t.alike(handler.token, { token: 't', sign: 's', key: 'k' })
+
+  handler.authenticate = async () => { throw new Error('auth down') }
+  await t.exception(() => handler.refreshToken(), /auth down/)
+})
+
+test('protocols/v2-handler - requestWrite success, empty body, and token refresh', async (t) => {
+  const { aesEncrypt } = require('../../workers/lib/utils/crypto')
+  const key = 'write-key'
+  const handler = new WMApiV2({ rpc: {}, password: 'admin' })
+  handler.token = { token: 't', sign: 'sig', key }
+
+  handler._requestMiner = async () => ({ enc: aesEncrypt(JSON.stringify({ Code: 131, Msg: 'ok' }), key) })
+  t.is((await handler.requestWrite('reboot', { respbefore: 'true' })).Code, 131)
+
+  handler._requestMiner = async () => ''
+  t.is(await handler.requestWrite('reboot'), null, 'empty body is a write with no response')
+
+  handler.token = undefined
+  handler.authenticate = async () => {
+    handler.token = { token: 't2', sign: 'sig2', key }
+    return handler.token
+  }
+  handler._requestMiner = async () => ({ enc: aesEncrypt(JSON.stringify({ Code: 131, Msg: 'ok' }), key) })
+  t.is((await handler.requestWrite('update_pools', { pool1: 'a' })).Msg, 'ok')
+})
+
+test('protocols/v2-handler - requestWrite retries expired tokens then succeeds', async (t) => {
+  const { aesEncrypt } = require('../../workers/lib/utils/crypto')
+  const handler = new WMApiV2({ rpc: {}, password: 'admin' })
+  let key = 'old'
+  handler.token = { token: 't', sign: 'sig', key }
+  handler.authenticate = async () => {
+    key = 'new'
+    handler.token = { token: 't2', sign: 'sig2', key }
+    return handler.token
+  }
+  let n = 0
+  handler._requestMiner = async () => {
+    n++
+    const code = n === 1 ? 135 : 131
+    return { enc: aesEncrypt(JSON.stringify({ Code: code, Msg: 'ok' }), key) }
+  }
+  t.is((await handler.requestWrite('reboot')).Code, 131)
+  t.is(n, 2)
+})
+
+test('protocols/v2-handler - requestWrite gives up after repeated failures', async (t) => {
+  const handler = new WMApiV2({ rpc: {}, password: 'admin' })
+  handler.token = { token: 't', sign: 'sig', key: 'k' }
+  handler.authenticate = async () => {
+    handler.token = { token: 't', sign: 'sig', key: 'k' }
+    return handler.token
+  }
+  let n = 0
+  handler._requestMiner = async () => {
+    n++
+    return { Code: 14 }
+  }
+  await t.exception(() => handler.requestWrite('reboot'), /ERR_INVALID_CMD/)
+  t.is(n, 3, 'three attempts')
+})
+
+test('protocols/v2-handler - requestWrite returns null when every token is expired', async (t) => {
+  const { aesEncrypt } = require('../../workers/lib/utils/crypto')
+  const handler = new WMApiV2({ rpc: {}, password: 'admin' })
+  handler.token = { token: 't', sign: 'sig', key: 'k' }
+  handler.authenticate = async () => {
+    handler.token = { token: 't', sign: 'sig', key: 'k' }
+    return handler.token
+  }
+  handler._requestMiner = async () => ({ enc: aesEncrypt(JSON.stringify({ Code: 135 }), 'k') })
+  t.is(await handler.requestWrite('reboot'), null)
+})
+
 test('protocols/v2-handler - isResponseOK', (t) => {
   const handler = new WMApiV2({ rpc: {}, password: 'admin' })
 

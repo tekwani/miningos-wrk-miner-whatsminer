@@ -95,6 +95,18 @@ test('connectThing connects using defaultPassword when the thing has no opts.pas
   t.is(thg.ctrl.opts.username, 'confuser', 'controller built with the default username')
 })
 
+test('connectThing records apiVersion without prior info and forwards miner errors', async (t) => {
+  const errors = []
+  const ctx = makeConnectCtx({ defaultPassword: 'confpass' })
+  ctx.debugThingError = (thg, err) => errors.push({ id: thg.id, message: err.message })
+  const thg = { id: 't-new', type: 'miner', opts: { address: '10.0.0.1', port: 4028, apiVersion: '2.0.5', password: 'pw' } }
+  t.is(await ctx.connectThing(thg), 1)
+  t.is(thg.info.apiVersion, '2.0.5')
+  t.is(thg.ctrl._getLogCoreManager(), null)
+  thg.ctrl.emit('error', new Error('socket down'))
+  t.is(errors[0].message, 'socket down')
+})
+
 test('connectThing connects with the defaults when overwriteCredsWithDefault is true', async (t) => {
   const ctx = makeConnectCtx({ defaultUsername: 'confuser', defaultPassword: 'confpass', overwriteCredsWithDefault: true })
   const thg = { id: 't1', type: 'miner', opts: { address: '10.0.0.1', port: 4028, apiVersion: '2.0.5', username: 'optsuser', password: 'optspass' }, info: {} }

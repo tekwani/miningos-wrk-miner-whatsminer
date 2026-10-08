@@ -326,6 +326,60 @@ test('protocols/v3-handler - command transformation patterns', (t) => {
   }
 })
 
+test('protocols/v3-handler - parseResponse passes through non-v3 payloads', (t) => {
+  const handler = new WMApiV3({ rpc: {}, password: 'super' })
+  t.is(handler.parseResponse(null, 'summary'), null)
+  t.alike(handler.parseResponse({ leftover: true }, 'summary'), { leftover: true })
+})
+
+test('protocols/v3-handler - devdetails array is converted', (t) => {
+  const handler = new WMApiV3({ rpc: {}, password: 'super' })
+  const parsed = handler.parseResponse({ code: 0, msg: [{ slot: 2, name: 'board' }] }, 'devdetails')
+  t.is(parsed.DEVDETAILS[0].Name, 'board')
+  t.is(parsed.DEVDETAILS[0].DEVDETAILS, 2)
+})
+
+test('protocols/v3-handler - refreshToken rethrows auth errors', async (t) => {
+  const handler = new WMApiV3({ rpc: {}, password: 'super' })
+  let called = false
+  handler.authenticate = async () => { called = true }
+  await handler.refreshToken()
+  t.ok(called)
+
+  handler.authenticate = async () => { throw new Error('auth down') }
+  await t.exception(() => handler.refreshToken(), /auth down/)
+})
+
+test('protocols/v3-handler - requestWrite empty body, no permission, and hard failures', async (t) => {
+  const { sha256, aesEncrypt } = require('../../workers/lib/utils/crypto')
+  const key = sha256('fixed').toString('hex')
+
+  const empty = new WMApiV3({ rpc: {}, password: 'p' })
+  empty.salt = 'somesalt'
+  empty._generateToken = () => ({ token: 'tok12345', key })
+  empty._requestMiner = async () => ''
+  t.is(await empty.requestWrite('set.miner.power'), null)
+
+  const denied = new WMApiV3({ rpc: {}, password: 'p' })
+  denied.salt = 'somesalt'
+  denied.authenticate = async () => { denied.salt = 'somesalt' }
+  denied._generateToken = () => ({ token: 'tok12345', key })
+  denied._requestMiner = async () => ({ enc: aesEncrypt(JSON.stringify({ code: -4, msg: 'no' }), key) })
+  t.is(await denied.requestWrite('set.miner.power'), null, 'exhausted no-permission retries')
+
+  const failed = new WMApiV3({ rpc: {}, password: 'p' })
+  failed.salt = 'somesalt'
+  failed.authenticate = async () => { failed.salt = 'somesalt' }
+  failed._generateToken = () => ({ token: 'tok12345', key })
+  let n = 0
+  failed._requestMiner = async () => {
+    n++
+    return { code: -1, msg: 'fail' }
+  }
+  await t.exception(() => failed.requestWrite('set.miner.power'), /ERR_FAIL/)
+  t.is(n, 3)
+})
+
 test('protocols/v3-handler - requestWrite uses username as account', async (t) => {
   const { sha256, aesEncrypt, aesDecryptHex } = require('../../workers/lib/utils/crypto')
   const handler = new WMApiV3({ rpc: {}, password: 'p', username: 'operator1' })

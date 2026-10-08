@@ -19,6 +19,10 @@ test('utils - getErrorMsg function', (t) => {
   t.is(getErrorMsg(99999), 'Unknown error', 'should return "Unknown error" for unknown code')
   t.is(getErrorMsg(0), 'Unknown error', 'should return "Unknown error" for code 0')
   t.is(getErrorMsg(-1), 'Unknown error', 'should return "Unknown error" for negative code')
+
+  t.is(getErrorMsg(200, 'miner-wm-m63spp'), 'power_probing_error', 'm63spp uses its own table')
+  t.is(getErrorMsg(110, 'miner-wm-m63spp'), 'hashrate_low', 'm63spp falls back to the shared table')
+  t.is(getErrorMsg(99999, 'miner-wm-m63spp'), 'Unknown error', 'unknown m63spp codes stay unknown')
 })
 
 test('utils - getAPICodeMsg function', (t) => {
@@ -38,6 +42,7 @@ test('utils - getAPICodeMsg function', (t) => {
   // Test unknown API code
   t.is(getAPICodeMsg({ Code: 999 }), 'Error 999: Unknown code', 'should return "Unknown code" for unknown code')
   t.is(getAPICodeMsg({ Code: 0 }), 'Error 0: Unknown code', 'should return "Unknown code" for code 0')
+  t.is(getAPICodeMsg({ Code: 23, Msg: 'enc json load err' }), 'Invalid authentication', 'bad ciphertext is an auth failure')
 })
 
 test('utils - getAPICodeMsg with Code 23 special case', (t) => {

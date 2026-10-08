@@ -64,3 +64,40 @@ test('worker-base: getFirmwareById throws when not found', async (t) => {
   const c = ctx({ conf: { thing: {} }, listFirmwares: async () => [] })
   await t.exception(() => c.getFirmwareById('missing'), /ERR_FIRMWARE_NOT_FOUND/)
 })
+
+test('worker-base: getFirmwareById returns the file and rejects a missing file', async (t) => {
+  const fs = require('fs/promises')
+  const os = require('os')
+  const path = require('path')
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-fw-'))
+  t.teardown(() => fs.rm(dir, { recursive: true, force: true }))
+  await fs.writeFile(path.join(dir, 'a.bin'), 'fw')
+
+  const found = ctx({
+    conf: { thing: { dirFirmwares: dir } },
+    listFirmwares: async () => [{ id: '1', file: 'a.bin' }]
+  })
+  t.is(await found.getFirmwareById('1'), path.join(dir, 'a.bin'))
+
+  const missing = ctx({
+    conf: { thing: { dirFirmwares: dir } },
+    listFirmwares: async () => [{ id: '2', file: 'nope.bin' }]
+  })
+  await t.exception(() => missing.getFirmwareById('2'), /ERR_FIRMWARE_FILE_NOT_FOUND/)
+})
+
+test('worker-base: getMinerApiRes validates serial, setup, and api name', async (t) => {
+  const c = ctx({ mem: { things: {} } })
+  await t.exception(() => c.getMinerApiRes({}), /ERR_INVALID_MINER_SERIAL/)
+  await t.exception(() => c.getMinerApiRes({ serialNum: 's1', api: 'summary' }), /ERR_MINER_NOT_FOUND/)
+
+  c.mem.things.a = { info: { serialNum: 's1' } }
+  await t.exception(() => c.getMinerApiRes({ serialNum: 's1', api: 'summary' }), /ERR_MINER_NOT_SETUP/)
+
+  c.mem.things.a.ctrl = { apiRes: {} }
+  await t.exception(() => c.getMinerApiRes({ serialNum: 's1' }), /ERR_INVALID_MINER_API/)
+  await t.exception(() => c.getMinerApiRes({ serialNum: 's1', api: 'summary' }), /ERR_INVALID_MINER_API/)
+
+  c.mem.things.a.ctrl.apiRes.summary = { Code: 131 }
+  t.alike(await c.getMinerApiRes({ serialNum: 's1', api: 'summary' }), { Code: 131 })
+})

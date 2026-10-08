@@ -94,6 +94,13 @@ test('protocols/base-handler - debugError default', (t) => {
   t.ok(true, 'debugError should not throw with default')
 })
 
+test('protocols/base-handler - abstract methods throw', async (t) => {
+  await t.exception(() => WMApiBase.prototype.authenticate(), /must be implemented/)
+  await t.exception(() => WMApiBase.prototype.requestRead('cmd'), /must be implemented/)
+  await t.exception(() => WMApiBase.prototype.requestWrite('cmd'), /must be implemented/)
+  t.exception(() => WMApiBase.prototype.getAuthCommand(), /must be implemented/)
+})
+
 test('protocols/base-handler - debugError custom', (t) => {
   const messages = []
   const handler = new TestHandler({
